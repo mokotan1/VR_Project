@@ -1,0 +1,17 @@
+{
+    "name": "VRProject.Infrastructure",
+    "rootNamespace": "VRProject.Infrastructure",
+    "references": [
+        "VRProject.Domain",
+        "VRProject.Application"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

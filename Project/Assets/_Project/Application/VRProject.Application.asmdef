@@ -1,0 +1,16 @@
+{
+    "name": "VRProject.Application",
+    "rootNamespace": "VRProject.Application",
+    "references": [
+        "VRProject.Domain"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": true
+}

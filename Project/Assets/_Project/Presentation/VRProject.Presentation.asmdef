@@ -1,0 +1,21 @@
+{
+    "name": "VRProject.Presentation",
+    "rootNamespace": "VRProject.Presentation",
+    "references": [
+        "VRProject.Domain",
+        "VRProject.Application",
+        "VRProject.Infrastructure",
+        "Unity.XR.Interaction.Toolkit",
+        "Unity.InputSystem",
+        "Unity.XR.CoreUtils"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
