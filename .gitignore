@@ -88,6 +88,14 @@ Project/[Aa]ssets/Unity.VisualScripting.Generated/VisualScripting.Core/Property 
 # Auto-generated scenes by play mode tests
 Project/[Aa]ssets/[Ii]nit[Tt]est[Ss]cene*.unity*
 
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+*.egg-info/
+.env
+
 # OS generated files
 .DS_Store
 Thumbs.db
