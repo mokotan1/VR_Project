@@ -1,0 +1,18 @@
+{
+    "name": "VRProject.Editor",
+    "rootNamespace": "VRProject.EditorTools",
+    "references": [
+        "VRProject.Presentation"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
