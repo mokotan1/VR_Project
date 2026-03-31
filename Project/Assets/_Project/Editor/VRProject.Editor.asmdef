@@ -2,7 +2,8 @@
     "name": "VRProject.Editor",
     "rootNamespace": "VRProject.EditorTools",
     "references": [
-        "VRProject.Presentation"
+        "VRProject.Presentation",
+        "Unity.XR.Interaction.Toolkit"
     ],
     "includePlatforms": [
         "Editor"
