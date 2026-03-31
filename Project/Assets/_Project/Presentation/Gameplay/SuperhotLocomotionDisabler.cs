@@ -6,13 +6,14 @@ using UnityEngine.XR.Interaction.Toolkit.Locomotion.Turning;
 namespace VRProject.Presentation.Gameplay
 {
     /// <summary>
-    /// Disables thumbstick / teleport locomotion so play stays room-scale + node grab only (SUPERHOT VR style).
+    /// Optionally disables thumbstick / teleport locomotion for room-scale + node grab only (SUPERHOT VR style).
+    /// Default is off so XR rig matches Starter Assets / demo locomotion unless you enable Disable On Awake here.
     /// </summary>
     [DefaultExecutionOrder(-30)]
     [DisallowMultipleComponent]
     public sealed class SuperhotLocomotionDisabler : MonoBehaviour
     {
-        [SerializeField] bool _disableOnAwake = true;
+        [SerializeField] bool _disableOnAwake;
 
         [Tooltip("If set, only providers under this transform are disabled; otherwise the whole loaded scene is scanned.")]
         [SerializeField] Transform _searchRoot;

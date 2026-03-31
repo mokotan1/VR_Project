@@ -37,14 +37,40 @@ namespace VRProject.Presentation.Gameplay
 
         void OnSelectEntered(SelectEnterEventArgs _)
         {
-            if (_xrOrigin == null)
-                _xrOrigin = FindAnyObjectByType<XROrigin>();
-            if (_xrOrigin == null || _cameraWorldDestination == null)
+            ActivateExit();
+        }
+
+        /// <summary>
+        /// VR grab or flat playtest (E key raycast). Teleports the active rig and advances the node flow.
+        /// </summary>
+        public void ActivateExit()
+        {
+            if (_cameraWorldDestination == null)
                 return;
 
-            _xrOrigin.MoveCameraToWorldLocation(_cameraWorldDestination.position);
-            _xrOrigin.MatchOriginUpCameraForward(_cameraWorldDestination.up, _cameraWorldDestination.forward);
+            var flat = FindFirstObjectByType<SuperhotFlatPlaytestRig>(FindObjectsInactive.Exclude);
+            if (flat != null)
+            {
+                flat.TeleportToCameraPose(_cameraWorldDestination);
+                AdvanceAndHide();
+                return;
+            }
 
+            var origin = _xrOrigin;
+            if (origin == null || !origin.gameObject.activeInHierarchy)
+                origin = FindFirstObjectByType<XROrigin>(FindObjectsInactive.Exclude);
+
+            if (origin == null || !origin.gameObject.activeInHierarchy)
+                return;
+
+            origin.MoveCameraToWorldLocation(_cameraWorldDestination.position);
+            origin.MatchOriginUpCameraForward(_cameraWorldDestination.up, _cameraWorldDestination.forward);
+
+            AdvanceAndHide();
+        }
+
+        void AdvanceAndHide()
+        {
             if (_nodeFlow != null && _owningZone != null)
                 _nodeFlow.AdvanceFromZone(_owningZone);
 

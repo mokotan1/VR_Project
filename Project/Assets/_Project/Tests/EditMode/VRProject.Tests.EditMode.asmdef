@@ -4,7 +4,8 @@
     "references": [
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner",
-        "VRProject.Application"
+        "VRProject.Application",
+        "VRProject.Presentation"
     ],
     "includePlatforms": [
         "Editor"

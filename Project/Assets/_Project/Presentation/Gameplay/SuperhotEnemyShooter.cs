@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.XR;
 using VRProject.Domain.Gameplay;
 using VRProject.Infrastructure.DI;
 
@@ -39,6 +40,8 @@ namespace VRProject.Presentation.Gameplay
 
         void Update()
         {
+            RefreshPlayerTarget();
+
             if (_projectilePrefab == null || _hmd == null)
                 return;
 
@@ -56,6 +59,24 @@ namespace VRProject.Presentation.Gameplay
 
             var proj = Instantiate(_projectilePrefab, origin, Quaternion.LookRotation(to.normalized));
             proj.Launch(to.normalized);
+        }
+
+        void RefreshPlayerTarget()
+        {
+            if (XRSettings.isDeviceActive)
+            {
+                if (_origin == null || !_origin.gameObject.activeInHierarchy)
+                    _origin = FindAnyObjectByType<Unity.XR.CoreUtils.XROrigin>();
+
+                if (_origin != null && _origin.Camera != null)
+                    _hmd = _origin.Camera.transform;
+            }
+            else
+            {
+                var main = Camera.main;
+                if (main != null)
+                    _hmd = main.transform;
+            }
         }
     }
 }
