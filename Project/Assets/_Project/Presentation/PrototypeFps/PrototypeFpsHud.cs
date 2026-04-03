@@ -43,12 +43,12 @@ namespace VRProject.Presentation.PrototypeFps
                 return;
 
             var pickup = _weapon != null && !_weapon.IsEquipped
-                ? "Walk into the HK416 to pick up.\n"
+                ? "HK416 근처(약 1.3m)로 가면 자동 습득.\n"
                 : string.Empty;
 
             _hintText.text =
                 pickup +
-                "WASD   Mouse look   RMB aim   LMB fire   R reload   Esc cursor";
+                "WASD 이동   마우스 시점(1인칭)   RMB 조준   LMB 발사   R 재장전   Esc 커서";
         }
     }
 }

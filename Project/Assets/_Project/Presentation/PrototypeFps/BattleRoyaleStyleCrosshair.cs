@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.Serialization;
 using UnityEngine.UI;
 using VRProject.Presentation.OsFpsInspired;
 
@@ -13,7 +14,7 @@ namespace VRProject.Presentation.PrototypeFps
         const float MinLineOffset = 7f;
         const float SpreadLerpSpeed = 14f;
 
-        [SerializeField] PrototypeThirdPersonPlayer _player;
+        [SerializeField, FormerlySerializedAs("_player")] MonoBehaviour _locomotionMotor;
         [SerializeField] OsFpsInspiredWeapon _weapon;
         [SerializeField] RectTransform _dot;
         [SerializeField] RectTransform _lineTop;
@@ -44,22 +45,23 @@ namespace VRProject.Presentation.PrototypeFps
 
         void Update()
         {
-            if (_player == null)
+            var motor = _locomotionMotor as IUnityChanLocomotionMotor;
+            if (motor == null)
                 return;
 
-            var moveAxes = _player.LocomotionAxes;
+            var moveAxes = motor.LocomotionAxes;
             var moveMag = new Vector2(moveAxes.x, moveAxes.y).magnitude;
             var sinceFire = _weapon != null ? Time.unscaledTime - _weapon.LastFireUnscaledTime : 999f;
             var rawSpread = BattleRoyaleCrosshairSpread.ComputeRawSpread(
                 moveMag,
-                _player.IsGrounded,
-                _player.IsAiming,
+                motor.IsGrounded,
+                motor.IsAiming,
                 sinceFire);
 
             _smoothedSpread = Mathf.Lerp(_smoothedSpread, rawSpread, Time.deltaTime * SpreadLerpSpeed);
 
             var offset = MinLineOffset + _smoothedSpread;
-            var col = _player.IsAiming ? _colorAim : _color;
+            var col = motor.IsAiming ? _colorAim : _color;
 
             if (_dot != null)
                 _dot.sizeDelta = new Vector2(_dotSize, _dotSize);

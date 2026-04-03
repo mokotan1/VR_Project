@@ -3,7 +3,7 @@ using VRProject.Presentation.OsFpsInspired;
 
 namespace VRProject.Presentation.PrototypeFps
 {
-    [RequireComponent(typeof(PrototypeThirdPersonPlayer))]
+    [DisallowMultipleComponent]
     public sealed class UnityChanLocomotionAnimatorBridge : MonoBehaviour
     {
         const string WeaponUpperLayerName = "WeaponUpper";
@@ -20,14 +20,14 @@ namespace VRProject.Presentation.PrototypeFps
         [SerializeField] float _weaponAimLayerWeight = 0.94f;
         [SerializeField] float _weaponLayerBlendSpeed = 5f;
 
-        PrototypeThirdPersonPlayer _player;
+        IUnityChanLocomotionMotor _motor;
         OsFpsInspiredWeapon _weapon;
         int _weaponUpperLayerIndex = -1;
         float _weaponUpperWeight;
 
         void Awake()
         {
-            _player = GetComponent<PrototypeThirdPersonPlayer>();
+            _motor = UnityChanLocomotionMotorResolver.ResolveOn(gameObject);
             _weapon = GetComponent<OsFpsInspiredWeapon>();
             if (_animator == null)
                 _animator = GetComponentInChildren<Animator>();
@@ -37,11 +37,11 @@ namespace VRProject.Presentation.PrototypeFps
 
         void LateUpdate()
         {
-            if (_animator == null)
+            if (_animator == null || _motor == null)
                 return;
 
             _animator.speed = _animatorSpeed;
-            var axes = _player.LocomotionAxes;
+            var axes = _motor.LocomotionAxes;
             _animator.SetFloat(DirectionId, axes.x);
             _animator.SetFloat(SpeedId, axes.y);
 
@@ -50,7 +50,7 @@ namespace VRProject.Presentation.PrototypeFps
             // Idle/WalkBack had no jump entry. Controller was extended; allow jump from these states.
             var jumpReady = !_animator.IsInTransition(0) &&
                             (info.IsName("Idle") || info.IsName("Locomotion") || info.IsName("WalkBack"));
-            if (_player.TryCommitJumpToAnimator(jumpReady))
+            if (_motor.TryCommitJumpToAnimator(jumpReady))
                 _animator.SetBool(JumpId, true);
 
             if (info.IsName("Jump") && !_animator.IsInTransition(0))
@@ -66,7 +66,7 @@ namespace VRProject.Presentation.PrototypeFps
 
             var target = 0f;
             if (_weapon != null && _weapon.IsEquipped)
-                target = _player.IsAiming ? _weaponAimLayerWeight : _weaponEquippedLayerWeight;
+                target = _motor.IsAiming ? _weaponAimLayerWeight : _weaponEquippedLayerWeight;
 
             _weaponUpperWeight = Mathf.MoveTowards(
                 _weaponUpperWeight,

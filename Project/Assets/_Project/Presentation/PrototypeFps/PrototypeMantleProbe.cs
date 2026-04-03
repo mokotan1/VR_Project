@@ -4,7 +4,6 @@ using UnityEngine;
 namespace VRProject.Presentation.PrototypeFps
 {
     [RequireComponent(typeof(CharacterController))]
-    [RequireComponent(typeof(PrototypeThirdPersonPlayer))]
     public sealed class PrototypeMantleProbe : MonoBehaviour
     {
         [SerializeField] float _forwardProbe = 0.55f;
@@ -21,18 +20,18 @@ namespace VRProject.Presentation.PrototypeFps
         [SerializeField] LayerMask _probeMask = Physics.DefaultRaycastLayers;
 
         CharacterController _cc;
-        PrototypeThirdPersonPlayer _player;
+        IUnityChanLocomotionMotor _motor;
         Coroutine _active;
 
         void Awake()
         {
             _cc = GetComponent<CharacterController>();
-            _player = GetComponent<PrototypeThirdPersonPlayer>();
+            _motor = UnityChanLocomotionMotorResolver.ResolveOn(gameObject);
         }
 
         public bool TryBeginFromSpace()
         {
-            if (_active != null || _player == null || !_cc.isGrounded)
+            if (_active != null || _motor == null || !_cc.isGrounded)
                 return false;
 
             if (!TryEvaluateLedge(out var deltaY, out var ledgeTop, out var forwardFlat))
@@ -45,8 +44,8 @@ namespace VRProject.Presentation.PrototypeFps
                 case MantleBand.None:
                     return false;
                 case MantleBand.JumpBand:
-                    _player.ApplyLedgeAssist(_jumpAssistVertical, forwardFlat * _jumpAssistForward);
-                    _player.ArmAnimationJumpSignal();
+                    _motor.ApplyLedgeAssist(_jumpAssistVertical, forwardFlat * _jumpAssistForward);
+                    _motor.ArmAnimationJumpSignal();
                     return true;
                 case MantleBand.MantleBand:
                     _active = StartCoroutine(MantleRoutine(ledgeTop, forwardFlat));
@@ -100,7 +99,7 @@ namespace VRProject.Presentation.PrototypeFps
 
         IEnumerator MantleRoutine(Vector3 ledgeTop, Vector3 forwardFlat)
         {
-            _player.SetMotorLocked(true);
+            _motor.SetMotorLocked(true);
             var start = transform.position;
             var end = start;
             end.y = ledgeTop.y + _cc.skinWidth * 2f;
@@ -116,7 +115,7 @@ namespace VRProject.Presentation.PrototypeFps
                 yield return null;
             }
 
-            _player.SetMotorLocked(false);
+            _motor.SetMotorLocked(false);
             _active = null;
         }
     }

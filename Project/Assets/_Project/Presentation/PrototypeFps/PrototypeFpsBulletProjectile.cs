@@ -18,10 +18,10 @@ namespace VRProject.Presentation.PrototypeFps
             _speed = speed;
             _maxDistance = maxDistance;
             _spawnPosition = transform.position;
-            if (visualEulerOffset == Vector3.zero)
-                transform.forward = _direction;
-            else
-                transform.rotation = Quaternion.LookRotation(_direction) * Quaternion.Euler(visualEulerOffset);
+
+            var dir = _direction;
+            var up = Mathf.Abs(Vector3.Dot(dir, Vector3.up)) > 0.98f ? Vector3.right : Vector3.up;
+            transform.rotation = Quaternion.LookRotation(dir, up) * Quaternion.Euler(visualEulerOffset);
         }
 
         void Update()

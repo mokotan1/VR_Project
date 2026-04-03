@@ -3,26 +3,25 @@ using UnityEngine.InputSystem;
 
 namespace VRProject.Presentation.PrototypeFps
 {
+    /// <summary>
+    /// 이동·시점: 몸통 Yaw + Pitch. 1인칭(눈·뷰모델 총) 또는 어깨 너머(캐릭터 전신이 보이도록) 선택.
+    /// </summary>
     [RequireComponent(typeof(CharacterController))]
-    public sealed class PrototypeThirdPersonPlayer : MonoBehaviour
+    public sealed class PrototypeThirdPersonPlayer : MonoBehaviour, IUnityChanLocomotionMotor
     {
         [SerializeField] Camera _camera;
         [SerializeField] Transform _cameraPivot;
+        [Tooltip("끄면 순수 1인칭(CS:GO처럼 카메라에 붙은 뷰모델 총). 켜면 어깨 너머로 캐릭터·손 총이 보입니다.")]
+        [SerializeField] bool _overShoulderCamera = false;
+        [Tooltip("캐릭터 로컬 기준 카메라 위치(대략 오른쪽 어깨 뒤).")]
+        [SerializeField] Vector3 _shoulderCameraLocalOffset = new Vector3(0.38f, 1.42f, -2.35f);
         [SerializeField] float _moveSpeed = 4.2f;
         [SerializeField] float _mouseSensitivity = 0.09f;
         [SerializeField] float _aimMouseSensitivityMultiplier = 0.78f;
-        [SerializeField] float _cameraDistance = 3.4f;
-        [SerializeField] float _lookTargetHeight = 1.35f;
-        [SerializeField] float _cameraSideOffset = 0.28f;
-        [Tooltip("RMB 조준 시 카메라 거리 (멀수록 캐릭터가 작아져 머리가 십자선을 덜 가림).")]
-        [SerializeField] float _aimCameraDistance = 4.35f;
-        [Tooltip("조준 시 좌우 오프셋 (어깨 쪽으로 더 밀어 중앙 시야에서 머리를 치움).")]
-        [SerializeField] float _aimCameraSideOffset = 0.62f;
-        [Tooltip("조준 시 LookAt 높이. 기본보다 낮추면 카메라가 약간 아래를 보며 머리가 화면 위쪽으로 밀림.")]
-        [SerializeField] float _aimLookTargetHeight = 1.02f;
-        [SerializeField] float _aimCameraBlendSpeed = 7f;
-        [SerializeField] float _defaultFieldOfView = 60f;
-        [SerializeField] float _aimFieldOfView = 48f;
+        [Tooltip("카메라(눈)를 얼굴 메시 안쪽이 아니라 약간 앞·위로 밀어 클리핑을 줄입니다.")]
+        [SerializeField] Vector3 _firstPersonCameraLocalOffset = new Vector3(0f, 0.03f, 0.1f);
+        [SerializeField] float _defaultFieldOfView = 72f;
+        [SerializeField] float _aimFieldOfView = 55f;
         [SerializeField] float _fovLerpSpeed = 10f;
         [SerializeField] float _jumpPower = 6.5f;
         [SerializeField] PrototypeMantleProbe _mantleProbe;
@@ -36,7 +35,6 @@ namespace VRProject.Presentation.PrototypeFps
         bool _controlsEnabled = true;
         bool _motorLocked;
         CharacterController _characterController;
-        float _aimCameraBlend;
 
         /// <summary>Mecanim axes: x = Direction (strafe), y = Speed (Unity-Chan Locomotions).</summary>
         public Vector2 LocomotionAxes => _lastLocomotionAxes;
@@ -52,7 +50,13 @@ namespace VRProject.Presentation.PrototypeFps
             if (_mantleProbe == null)
                 _mantleProbe = GetComponent<PrototypeMantleProbe>();
             if (_camera != null)
+            {
                 _camera.fieldOfView = _defaultFieldOfView;
+                if (_overShoulderCamera)
+                    _camera.nearClipPlane = Mathf.Max(_camera.nearClipPlane, 0.12f);
+                else
+                    _camera.nearClipPlane = Mathf.Min(_camera.nearClipPlane, 0.06f);
+            }
         }
 
         public void SetControlsEnabled(bool enabled)
@@ -120,7 +124,7 @@ namespace VRProject.Presentation.PrototypeFps
                 var d = Mouse.current.delta.ReadValue();
                 _yaw += d.x * sens;
                 _pitch -= d.y * sens;
-                _pitch = Mathf.Clamp(_pitch, -8f, 52f);
+                _pitch = Mathf.Clamp(_pitch, -88f, 88f);
             }
 
             transform.rotation = Quaternion.Euler(0f, _yaw, 0f);
@@ -183,20 +187,22 @@ namespace VRProject.Presentation.PrototypeFps
 
         void LateUpdate()
         {
-            if (_camera == null || _cameraPivot == null)
+            if (_camera == null)
                 return;
 
-            var aimTarget = _controlsEnabled && IsAiming ? 1f : 0f;
-            _aimCameraBlend = Mathf.MoveTowards(_aimCameraBlend, aimTarget, Time.deltaTime * _aimCameraBlendSpeed);
+            if (_overShoulderCamera)
+            {
+                var shoulderWorld = transform.position + transform.rotation * _shoulderCameraLocalOffset;
+                var viewRot = transform.rotation * Quaternion.Euler(_pitch, 0f, 0f);
+                _camera.transform.SetPositionAndRotation(shoulderWorld, viewRot);
+                return;
+            }
 
-            var dist = Mathf.Lerp(_cameraDistance, _aimCameraDistance, _aimCameraBlend);
-            var sideOff = Mathf.Lerp(_cameraSideOffset, _aimCameraSideOffset, _aimCameraBlend);
-            var lookH = Mathf.Lerp(_lookTargetHeight, _aimLookTargetHeight, _aimCameraBlend);
+            if (_cameraPivot == null)
+                return;
 
-            var side = _cameraPivot.right * sideOff;
-            _camera.transform.position = _cameraPivot.position + side + _cameraPivot.forward * (-dist);
-            var lookAt = transform.position + Vector3.up * lookH;
-            _camera.transform.LookAt(lookAt, Vector3.up);
+            _camera.transform.localPosition = _firstPersonCameraLocalOffset;
+            _camera.transform.localRotation = Quaternion.identity;
         }
     }
 }

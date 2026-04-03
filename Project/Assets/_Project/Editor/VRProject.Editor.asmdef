@@ -4,12 +4,14 @@
     "references": [
         "VRProject.Application",
         "VRProject.Presentation",
+        "DyrdaDev.FirstPersonController.Runtime",
         "Unity.AI.Navigation",
         "Unity.XR.CoreUtils",
         "Unity.XR.Interaction.Toolkit",
         "Unity.XR.Management",
         "Unity.XR.Management.Editor",
-        "UnityEngine.UI"
+        "UnityEngine.UI",
+        "Unity.RenderPipelines.Universal.Runtime"
     ],
     "includePlatforms": [
         "Editor"

@@ -1,5 +1,6 @@
-﻿using UnityEngine;
+using UnityEngine;
 using VRProject.Presentation.OsFpsInspired;
+using VRProject.Presentation.PrototypeFps;
 
 namespace VRProject.Presentation.PrototypeFps
 {
@@ -21,7 +22,7 @@ namespace VRProject.Presentation.PrototypeFps
 
         void OnDefeated()
         {
-            var motor = GetComponent<PrototypeThirdPersonPlayer>();
+            var motor = UnityChanLocomotionMotorResolver.ResolveOn(gameObject);
             if (motor != null)
                 motor.SetControlsEnabled(false);
             var w = GetComponent<OsFpsInspiredWeapon>();

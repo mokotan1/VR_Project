@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.Rendering;
 using VRProject.Presentation.PrototypeFps;
 
 namespace VRProject.Presentation.OsFpsInspired
@@ -10,12 +11,21 @@ namespace VRProject.Presentation.OsFpsInspired
         /// <summary>When false, use a world pickup (e.g. HK416 on the ground) before firing.</summary>
         [SerializeField] bool _startEquipped = false;
         [SerializeField] GameObject _handGunVisual;
+        [Tooltip("Barrel tip / muzzle. If unset, searches common names under the hand gun or creates a proxy from mesh bounds.")]
+        [SerializeField] Transform _muzzleTransform;
         [SerializeField] GameObject _bulletVisualPrefab;
-        [SerializeField] float _bulletVisualScale = 10f;
+        [Tooltip("Bullets Pack 메시는 매우 작음; 너무 작으면 트레일만 보일 수 있음.")]
+        [SerializeField] float _bulletVisualScale = 56f;
         [SerializeField] float _bulletSpeed = 95f;
+        [Tooltip("Fallback when no muzzle transform (camera-forward offset).")]
         [SerializeField] float _bulletMuzzleForwardOffset = 0.45f;
+        [Tooltip("DuNguyn 탄환 메시 등은 길이축이 +Z가 아닐 때 많음. 기본은 Y축 총알을 비행 방향(+Z)에 맞춤.")]
         [SerializeField] Vector3 _bulletVisualEulerOffset = new Vector3(90f, 0f, 0f);
         [SerializeField] bool _requireRightMouseAimToFire = true;
+        [Tooltip("조준(RMB) 필수일 때, 이동 입력(로코모션 축)이 있으면 힙 파이어 허용. WASD 사용 시 RMB 없이도 발사 가능.")]
+        [SerializeField] bool _allowHipFireWhileLocomoting = true;
+        [Tooltip("로코모션 축 크기 제곱이 이 값보다 크면 ‘이동 중’으로 간주합니다.")]
+        [SerializeField] float _locomotionHipFireAxesSqrThreshold = 1e-5f;
         [SerializeField] float _maxDistance = 120f;
         [SerializeField] int _magSize = 24;
         [SerializeField] float _fireCooldown = 0.12f;
@@ -27,8 +37,9 @@ namespace VRProject.Presentation.OsFpsInspired
         float _nextFire;
         float _reloadEnds;
         bool _equipped;
-        PrototypeThirdPersonPlayer _motor;
+        IUnityChanLocomotionMotor _motor;
         float _lastFireUnscaledTime = -999f;
+        Transform _runtimeMuzzleProxy;
 
         public int AmmoInMag => _ammoInMag;
         public int MagSize => _magSize;
@@ -41,7 +52,7 @@ namespace VRProject.Presentation.OsFpsInspired
         {
             if (_camera == null)
                 _camera = GetComponentInChildren<Camera>();
-            _motor = GetComponent<PrototypeThirdPersonPlayer>();
+            _motor = UnityChanLocomotionMotorResolver.ResolveOn(gameObject);
             _equipped = _startEquipped;
             if (_handGunVisual != null)
                 _handGunVisual.SetActive(_equipped);
@@ -52,7 +63,18 @@ namespace VRProject.Presentation.OsFpsInspired
         {
             _equipped = equipped;
             if (_handGunVisual != null)
+            {
                 _handGunVisual.SetActive(equipped);
+                if (equipped)
+                {
+                    foreach (var r in _handGunVisual.GetComponentsInChildren<Renderer>(true))
+                    {
+                        if (r != null)
+                            r.enabled = true;
+                    }
+                }
+            }
+
             if (equipped)
             {
                 _ammoInMag = _magSize;
@@ -63,6 +85,91 @@ namespace VRProject.Presentation.OsFpsInspired
                 _ammoInMag = 0;
                 _reloadEnds = 0f;
             }
+        }
+
+        Transform ResolveMuzzleTransform()
+        {
+            if (_muzzleTransform != null)
+                return _muzzleTransform;
+            if (_handGunVisual == null || !_handGunVisual.activeInHierarchy)
+                return null;
+            if (_runtimeMuzzleProxy != null)
+                return _runtimeMuzzleProxy;
+
+            var t = _handGunVisual.transform.Find("WeaponFirePoint");
+            if (t != null)
+            {
+                _runtimeMuzzleProxy = t;
+                return t;
+            }
+
+            var found = FindMuzzleByName(_handGunVisual.transform);
+            if (found != null)
+            {
+                _runtimeMuzzleProxy = found;
+                return found;
+            }
+
+            _runtimeMuzzleProxy = CreateBoundsMuzzleProxy(_handGunVisual.transform);
+            return _runtimeMuzzleProxy;
+        }
+
+        static Transform FindMuzzleByName(Transform root)
+        {
+            foreach (var tr in root.GetComponentsInChildren<Transform>(true))
+            {
+                var n = tr.name.ToLowerInvariant();
+                if (n.Contains("muzzle") || n.Contains("firepoint") || n.Contains("fire_point") ||
+                    n.Contains("barrel_tip") || n.Contains("tip") && n.Contains("barrel"))
+                    return tr;
+            }
+
+            return null;
+        }
+
+        static Transform CreateBoundsMuzzleProxy(Transform gunRoot)
+        {
+            var renderers = gunRoot.GetComponentsInChildren<Renderer>(true);
+            if (renderers.Length == 0)
+            {
+                var empty = new GameObject("WeaponFirePoint").transform;
+                empty.SetParent(gunRoot, false);
+                empty.localPosition = new Vector3(0f, 0f, 0.35f);
+                empty.localRotation = Quaternion.identity;
+                return empty;
+            }
+
+            var b = renderers[0].bounds;
+            for (var i = 1; i < renderers.Length; i++)
+                b.Encapsulate(renderers[i].bounds);
+
+            var forward = gunRoot.forward;
+            var corners = new Vector3[8];
+            var c = b.center;
+            var e = b.extents;
+            var idx = 0;
+            for (var x = -1f; x <= 1f; x += 2f)
+            for (var y = -1f; y <= 1f; y += 2f)
+            for (var z = -1f; z <= 1f; z += 2f)
+                corners[idx++] = c + new Vector3(e.x * x, e.y * y, e.z * z);
+
+            var best = corners[0];
+            var bestDot = float.MinValue;
+            foreach (var p in corners)
+            {
+                var d = Vector3.Dot(p - b.center, forward);
+                if (d > bestDot)
+                {
+                    bestDot = d;
+                    best = p;
+                }
+            }
+
+            var go = new GameObject("WeaponFirePoint");
+            go.transform.position = best;
+            go.transform.rotation = Quaternion.LookRotation(forward, gunRoot.up);
+            go.transform.SetParent(gunRoot, true);
+            return go.transform;
         }
 
         void Update()
@@ -87,7 +194,13 @@ namespace VRProject.Presentation.OsFpsInspired
             if (IsReloading)
                 return;
 
-            if (_requireRightMouseAimToFire && _motor != null && !_motor.IsAiming)
+            if (!OsFpsInspiredAimFireGate.PassesFireAimGate(
+                    _requireRightMouseAimToFire,
+                    _allowHipFireWhileLocomoting,
+                    _locomotionHipFireAxesSqrThreshold,
+                    _motor == null,
+                    _motor != null && _motor.IsAiming,
+                    _motor != null ? _motor.LocomotionAxes : Vector2.zero))
                 return;
 
             var fire = Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame;
@@ -98,12 +211,18 @@ namespace VRProject.Presentation.OsFpsInspired
             _ammoInMag--;
             _lastFireUnscaledTime = Time.unscaledTime;
 
-            var muzzle = cam.transform.position + cam.transform.forward * _bulletMuzzleForwardOffset;
-            var aimDir = cam.transform.forward;
-            SpawnBulletVisual(muzzle, aimDir);
+            // 총구 forward는 손 본 애니 때문에 아래/옆으로 틀어질 수 있음 → 조준은 항상 카메라 십자(뷰포트 중앙) 방향.
+            var aimRay = cam.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0f));
+            var aimDir = aimRay.direction.normalized;
 
-            var ray = new Ray(cam.transform.position, aimDir);
-            if (!Physics.Raycast(ray, out var hit, _maxDistance, _hitMask, QueryTriggerInteraction.Ignore))
+            var muzzleTr = ResolveMuzzleTransform();
+            var spawnPos = muzzleTr != null
+                ? muzzleTr.position
+                : aimRay.origin + aimDir * Mathf.Clamp(_bulletMuzzleForwardOffset, 0.05f, 3f);
+
+            SpawnBulletVisual(spawnPos, aimDir);
+
+            if (!TryFirstWorldHitExcludingSelf(aimRay, out var hit))
                 return;
 
             var dmg = hit.collider.GetComponentInParent<OsFpsInspiredDamageable>();
@@ -111,20 +230,118 @@ namespace VRProject.Presentation.OsFpsInspired
                 dmg.ApplyDamage(_damage, hit.point);
         }
 
+        bool IsPartOfShooterRig(Collider c)
+        {
+            if (c == null)
+                return false;
+            return c.transform == transform || c.transform.IsChildOf(transform);
+        }
+
+        bool TryFirstWorldHitExcludingSelf(Ray ray, out RaycastHit bestHit)
+        {
+            var hits = Physics.RaycastAll(ray, _maxDistance, _hitMask, QueryTriggerInteraction.Ignore);
+            if (hits.Length == 0)
+            {
+                bestHit = default;
+                return false;
+            }
+
+            System.Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
+            foreach (var h in hits)
+            {
+                if (IsPartOfShooterRig(h.collider))
+                    continue;
+                bestHit = h;
+                return true;
+            }
+
+            bestHit = default;
+            return false;
+        }
+
         void SpawnBulletVisual(Vector3 position, Vector3 direction)
         {
-            if (_bulletVisualPrefab == null)
-                return;
+            GameObject go;
+            Vector3 eulerForLaunch;
 
-            var go = Instantiate(_bulletVisualPrefab, position, Quaternion.identity);
-            go.transform.localScale = Vector3.one * _bulletVisualScale;
-            foreach (var col in go.GetComponentsInChildren<Collider>())
-                Destroy(col);
+            if (_bulletVisualPrefab != null)
+            {
+                go = Instantiate(_bulletVisualPrefab, position, Quaternion.identity);
+                go.transform.localScale = Vector3.one * _bulletVisualScale;
+                foreach (var col in go.GetComponentsInChildren<Collider>())
+                    Destroy(col);
+                eulerForLaunch = _bulletVisualEulerOffset;
+            }
+            else
+            {
+                go = new GameObject("BulletTracer_Fallback");
+                go.transform.position = position;
+                var meshGo = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                meshGo.name = "TracerMesh";
+                meshGo.transform.SetParent(go.transform, false);
+                meshGo.transform.localPosition = new Vector3(0f, 0f, 0.22f);
+                meshGo.transform.localScale = new Vector3(0.06f, 0.06f, 0.5f);
+                Destroy(meshGo.GetComponent<Collider>());
+                ApplyTracerMaterial(meshGo.GetComponent<MeshRenderer>());
+                eulerForLaunch = Vector3.zero;
+            }
 
             var proj = go.GetComponent<PrototypeFpsBulletProjectile>();
             if (proj == null)
                 proj = go.AddComponent<PrototypeFpsBulletProjectile>();
-            proj.Launch(direction, _bulletSpeed, _maxDistance, _bulletVisualEulerOffset);
+            proj.Launch(direction, _bulletSpeed, _maxDistance, eulerForLaunch);
+            AddBulletTrail(go);
+        }
+
+        static void ApplyTracerMaterial(MeshRenderer renderer)
+        {
+            if (renderer == null)
+                return;
+            var sh = Shader.Find("Universal Render Pipeline/Lit")
+                     ?? Shader.Find("Standard");
+            if (sh == null)
+                return;
+            var m = new Material(sh);
+            var c = new Color(1f, 0.88f, 0.2f);
+            if (m.HasProperty("_BaseColor"))
+                m.SetColor("_BaseColor", c);
+            else if (m.HasProperty("_Color"))
+                m.SetColor("_Color", c);
+            if (m.HasProperty("_EmissionColor"))
+            {
+                m.SetColor("_EmissionColor", new Color(1f, 0.75f, 0.1f) * 3f);
+                m.EnableKeyword("_EMISSION");
+            }
+
+            renderer.material = m;
+        }
+
+        static void AddBulletTrail(GameObject root)
+        {
+            var trail = root.GetComponent<TrailRenderer>();
+            if (trail == null)
+                trail = root.AddComponent<TrailRenderer>();
+            trail.emitting = true;
+            trail.time = 0.2f;
+            trail.minVertexDistance = 0.008f;
+            trail.startWidth = 0.09f;
+            trail.endWidth = 0.03f;
+            trail.numCapVertices = 4;
+            trail.shadowCastingMode = ShadowCastingMode.Off;
+            trail.receiveShadows = false;
+
+            var sh = Shader.Find("Universal Render Pipeline/Particles/Unlit")
+                     ?? Shader.Find("Universal Render Pipeline/Unlit")
+                     ?? Shader.Find("Unlit/Color")
+                     ?? Shader.Find("Sprites/Default");
+            if (sh == null)
+                return;
+            var m = new Material(sh);
+            if (m.HasProperty("_BaseColor"))
+                m.SetColor("_BaseColor", new Color(1f, 0.95f, 0.4f, 1f));
+            if (m.HasProperty("_Color"))
+                m.SetColor("_Color", new Color(1f, 0.95f, 0.4f, 1f));
+            trail.material = m;
         }
     }
 }

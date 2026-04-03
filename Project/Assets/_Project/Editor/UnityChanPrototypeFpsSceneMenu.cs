@@ -9,6 +9,7 @@ using UnityEngine;
 using UnityEngine.AI;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
+using DyrdaDev.FirstPersonController;
 using VRProject.Presentation.Common.Managers;
 using VRProject.Presentation.Gameplay;
 using VRProject.Presentation.OsFpsInspired;
@@ -20,6 +21,9 @@ namespace VRProject.EditorTools
     {
         /// <summary>Inside <c>Assets/Scenes/UnityChanPrototypeFps/</c> so NavMesh and scene stay together (avoid only opening the folder).</summary>
         const string ScenePath = "Assets/Scenes/UnityChanPrototypeFps/UnityChanPrototypeFps.unity";
+
+        /// <summary>Same layout as <see cref="ScenePath"/> but locomotion uses dyrdadev First-Person Controller + <see cref="DyrdaFirstPersonMotorAdapter"/> (no mantle).</summary>
+        const string ScenePathDyrdaFpc = "Assets/Scenes/UnityChanPrototypeFps/UnityChanPrototypeFps_DyrdaFpc.unity";
 
         const string LegacyScenePathAtScenesRoot = "Assets/Scenes/UnityChanPrototypeFps.unity";
         const string UnityChanPrefabPath = "Assets/unity-chan!/Unity-chan! Model/Prefabs/for Locomotion/unitychan_dynamic_locomotion.prefab";
@@ -103,6 +107,78 @@ namespace VRProject.EditorTools
             Debug.Log("[VR Project] Unity-Chan prototype FPS saved and opened: " + ScenePath +
                       " (project dataPath: " + UnityEngine.Application.dataPath + "). " +
                       "If nothing changed, confirm Unity is using this project folder. Add Tags Player and Enemy if missing.");
+        }
+
+        [MenuItem("VR Project/Scenes/Create Unity-Chan Prototype FPS (Dyrda FPC)")]
+        public static void CreateSceneDyrdaFpc()
+        {
+            EnsureProjectTagsExist("Player", "Enemy");
+
+            var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+
+            var lightGo = new GameObject("Directional Light");
+            var light = lightGo.AddComponent<Light>();
+            light.type = LightType.Directional;
+            lightGo.transform.rotation = Quaternion.Euler(50f, -30f, 0f);
+
+            var navRoot = new GameObject("NavWorld");
+            var floor = GameObject.CreatePrimitive(PrimitiveType.Plane);
+            floor.name = "Floor";
+            floor.transform.SetParent(navRoot.transform, false);
+            floor.transform.localScale = new Vector3(8f, 1f, 8f);
+            MarkNavigationStatic(floor);
+
+            var lit = ResolveUrpLitShader();
+            if (lit != null)
+                floor.GetComponent<MeshRenderer>().sharedMaterial = new Material(lit) { color = new Color(0.2f, 0.22f, 0.25f) };
+
+            BuildCoverArena(navRoot.transform, lit);
+            BuildParkourJump(navRoot.transform, lit);
+
+            var surface = navRoot.AddComponent<NavMeshSurface>();
+            surface.collectObjects = CollectObjects.Children;
+            surface.BuildNavMesh();
+
+            var systems = new GameObject("Systems");
+            systems.AddComponent<GameBootstrapper>();
+            systems.AddComponent<SuperhotGameplayDriver>();
+
+            var covers = BuildCoverPoints();
+            covers.transform.SetParent(navRoot.transform, false);
+
+            var coverList = new List<Transform>();
+            foreach (Transform t in covers.GetComponentsInChildren<Transform>(true))
+            {
+                if (t != covers.transform && t.name.StartsWith("CoverPoint", StringComparison.Ordinal))
+                    coverList.Add(t);
+            }
+
+            SpawnEnemies(coverList.ToArray(), lit);
+
+            var player = BuildUnityChanPlayerDyrdaFpc(lit);
+            player.transform.position = new Vector3(0f, 0f, -6f);
+
+            SpawnWeaponPickup(navRoot.transform, lit, new Vector3(2.2f, 0f, -5.5f));
+            SpawnBulletPackDecorations(navRoot.transform, new Vector3(2.55f, 0f, -5.25f));
+
+            WireHud(player);
+
+            EditorSceneManager.MarkSceneDirty(scene);
+            EnsureAssetDirectoryExists(ScenePathDyrdaFpc);
+            if (!EditorSceneManager.SaveScene(scene, ScenePathDyrdaFpc))
+            {
+                Debug.LogError("[VR Project] SaveScene failed — scene was not written. dataPath=" +
+                               UnityEngine.Application.dataPath + " path=\"" + ScenePathDyrdaFpc + "\"");
+                return;
+            }
+
+            AssetDatabase.Refresh();
+            RemoveSceneFromBuildSettingsIfPresent(LegacyScenePathAtScenesRoot);
+            AddToBuildSettings(ScenePathDyrdaFpc);
+            EditorSceneManager.OpenScene(ScenePathDyrdaFpc, OpenSceneMode.Single);
+
+            Debug.Log("[VR Project] Unity-Chan prototype FPS (Dyrda FPC) saved and opened: " + ScenePathDyrdaFpc +
+                      ". Locomotion: dyrdadev First-Person Controller; mantle probe omitted. Requires Input System + UniRx per package README.");
         }
 
         static void EnsureAssetDirectoryExists(string assetPath)
@@ -317,21 +393,97 @@ namespace VRProject.EditorTools
 
             var camPivot = new GameObject("CameraPivot");
             camPivot.transform.SetParent(player.transform, false);
-            camPivot.transform.localPosition = new Vector3(0f, 1.45f, 0f);
+            camPivot.transform.localPosition = new Vector3(0f, 1.58f, 0f);
 
             var camGo = new GameObject("Main Camera");
             camGo.transform.SetParent(camPivot.transform, false);
+            camGo.transform.localPosition = Vector3.zero;
+            camGo.transform.localRotation = Quaternion.identity;
             camGo.tag = "MainCamera";
             var cam = camGo.AddComponent<Camera>();
+            cam.nearClipPlane = 0.05f;
             camGo.AddComponent<AudioListener>();
+
+            player.AddComponent<PrototypeFirstPersonCosmeticCull>();
 
             var motor = player.AddComponent<PrototypeThirdPersonPlayer>();
             var mSo = new SerializedObject(motor);
             mSo.FindProperty("_camera").objectReferenceValue = cam;
             mSo.FindProperty("_cameraPivot").objectReferenceValue = camPivot.transform;
+            var osc = mSo.FindProperty("_overShoulderCamera");
+            if (osc != null)
+                osc.boolValue = false;
+            var slo = mSo.FindProperty("_shoulderCameraLocalOffset");
+            if (slo != null)
+                slo.vector3Value = new Vector3(0.38f, 1.42f, -2.35f);
             mSo.ApplyModifiedPropertiesWithoutUndo();
 
             player.AddComponent<PrototypeMantleProbe>();
+            AttachSharedUnityChanFpsGameplay(player, cam, litShader, fpsViewmodelUnderCamera: true);
+
+            return player;
+        }
+
+        static GameObject BuildUnityChanPlayerDyrdaFpc(Shader litShader)
+        {
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(UnityChanPrefabPath);
+            if (prefab == null)
+            {
+                Debug.LogError("[VR Project] Unity-Chan prefab missing at: " + UnityChanPrefabPath);
+                return new GameObject("MissingUnityChan");
+            }
+
+            var player = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
+            player.name = "UnityChan_Player";
+            if (PrefabUtility.IsPartOfPrefabInstance(player))
+                PrefabUtility.UnpackPrefabInstance(player, PrefabUnpackMode.Completely, InteractionMode.AutomatedAction);
+            TrySetTag(player, "Player");
+
+            foreach (var rb in player.GetComponentsInChildren<Rigidbody>(true))
+                UnityEngine.Object.DestroyImmediate(rb);
+
+            DestroyUnityChanMotorComponents(player);
+            StripBakedPrototypeRigFromPlayerRoot(player);
+
+            var oldCc = player.GetComponent<CharacterController>();
+            if (oldCc != null)
+                UnityEngine.Object.DestroyImmediate(oldCc);
+
+            var cc = player.AddComponent<CharacterController>();
+            cc.height = 1.35f;
+            cc.radius = 0.22f;
+            cc.center = new Vector3(0f, 0.68f, 0f);
+
+            var camGo = new GameObject("Main Camera");
+            camGo.transform.SetParent(player.transform, false);
+            camGo.transform.localPosition = new Vector3(0f, 1.58f, 0f);
+            camGo.transform.localRotation = Quaternion.identity;
+            camGo.tag = "MainCamera";
+            var cam = camGo.AddComponent<Camera>();
+            cam.nearClipPlane = 0.05f;
+            camGo.AddComponent<AudioListener>();
+
+            player.AddComponent<PrototypeFirstPersonCosmeticCull>();
+
+            var dyrdaInput = player.AddComponent<InputActionBasedFirstPersonControllerInput>();
+            var dyrdaFpc = player.AddComponent<FirstPersonController>();
+            var fpcSo = new SerializedObject(dyrdaFpc);
+            var inputProp = fpcSo.FindProperty("firstPersonControllerInput")
+                          ?? fpcSo.FindProperty("_firstPersonControllerInput");
+            if (inputProp != null)
+                inputProp.objectReferenceValue = dyrdaInput;
+            else
+                Debug.LogWarning("[VR Project] Could not bind FirstPersonController input field via SerializedObject; assign in Inspector if needed.");
+            fpcSo.ApplyModifiedPropertiesWithoutUndo();
+
+            player.AddComponent<DyrdaFirstPersonMotorAdapter>();
+            AttachSharedUnityChanFpsGameplay(player, cam, litShader, fpsViewmodelUnderCamera: true);
+
+            return player;
+        }
+
+        static void AttachSharedUnityChanFpsGameplay(GameObject player, Camera cam, Shader litShader, bool fpsViewmodelUnderCamera)
+        {
             player.AddComponent<UnityChanLocomotionAnimatorBridge>();
             var aimTwist = player.AddComponent<PrototypeAimSpineTwist>();
             var aimSo = new SerializedObject(aimTwist);
@@ -348,50 +500,114 @@ namespace VRProject.EditorTools
             player.AddComponent<PrototypeFpsPlayerDeathHandler>();
 
             GameObject gunVisual = null;
-            var hand = FindHandBone(player.transform);
-            var gunParent = hand != null ? hand : player.transform;
+            Transform muzzleTransform = null;
+            GameObject viewmodelRootGo = null;
+
+            Transform gunParent;
+            Vector3 gunLocalPos;
+            Quaternion gunLocalRot;
+            Vector3 gunLocalScale;
+            if (fpsViewmodelUnderCamera)
+            {
+                viewmodelRootGo = new GameObject("FpsWeaponViewmodel");
+                viewmodelRootGo.transform.SetParent(cam.transform, false);
+                viewmodelRootGo.transform.localPosition = Vector3.zero;
+                viewmodelRootGo.transform.localRotation = Quaternion.identity;
+                viewmodelRootGo.transform.localScale = Vector3.one;
+                gunParent = viewmodelRootGo.transform;
+                ComputeFpsViewmodelGunLayout(player, out gunLocalPos, out gunLocalRot, out gunLocalScale);
+            }
+            else
+            {
+                var hand = FindHandBone(player.transform);
+                gunParent = hand != null ? hand : player.transform;
+                if (hand != null)
+                {
+                    gunLocalPos = new Vector3(0.04f, 0.02f, 0.03f);
+                    gunLocalRot = Quaternion.Euler(0f, 90f, 0f);
+                }
+                else
+                {
+                    gunLocalPos = new Vector3(0.2f, 1.15f, 0.25f);
+                    gunLocalRot = Quaternion.Euler(0f, 90f, 0f);
+                }
+
+                var mul = GunScaleMulFromCharacter(player);
+                gunLocalScale = Vector3.one * (0.22f * mul);
+            }
+
             gunVisual = TryInstantiatePrefabUnder(Hk416PrefabPath, gunParent);
             if (gunVisual != null)
             {
                 if (PrefabUtility.IsPartOfPrefabInstance(gunVisual))
                     PrefabUtility.UnpackPrefabInstance(gunVisual, PrefabUnpackMode.Completely, InteractionMode.AutomatedAction);
                 gunVisual.name = "HandGun_HK416";
-                gunVisual.transform.localPosition = hand != null
-                    ? new Vector3(0.04f, 0.02f, 0.03f)
-                    : new Vector3(0.2f, 1.15f, 0.25f);
-                gunVisual.transform.localRotation = Quaternion.Euler(0f, 90f, 0f);
-                gunVisual.transform.localScale = Vector3.one * 0.22f;
+                gunVisual.transform.localPosition = gunLocalPos;
+                gunVisual.transform.localRotation = gunLocalRot;
+                gunVisual.transform.localScale = gunLocalScale;
                 StripCollidersUnder(gunVisual.transform);
                 UnityChanUrpMaterialRemapUtility.RemapRenderersUnder(gunVisual);
                 gunVisual.SetActive(false);
+                muzzleTransform = CreateWeaponFirePointUnderGun(gunVisual);
             }
             else if (litShader != null)
             {
                 gunVisual = GameObject.CreatePrimitive(PrimitiveType.Cube);
                 gunVisual.name = "ToyGun";
                 gunVisual.transform.SetParent(gunParent, false);
-                gunVisual.transform.localPosition = hand != null
-                    ? new Vector3(0.05f, 0.02f, 0.02f)
-                    : new Vector3(0.2f, 1.15f, 0.25f);
-                gunVisual.transform.localScale = new Vector3(0.08f, 0.06f, 0.22f);
+                gunVisual.transform.localPosition = gunLocalPos;
+                gunVisual.transform.localRotation = gunLocalRot;
+                var toyMul = GunScaleMulFromCharacter(player);
+                gunVisual.transform.localScale = fpsViewmodelUnderCamera
+                    ? new Vector3(0.07f, 0.05f, 0.28f) * toyMul
+                    : new Vector3(0.08f, 0.06f, 0.22f) * toyMul;
                 UnityEngine.Object.DestroyImmediate(gunVisual.GetComponent<BoxCollider>());
                 gunVisual.GetComponent<MeshRenderer>().sharedMaterial =
                     new Material(litShader) { color = new Color(0.15f, 0.15f, 0.18f) };
                 gunVisual.SetActive(false);
+                muzzleTransform = CreateToyGunFirePoint(gunVisual.transform);
             }
 
             wSo = new SerializedObject(weapon);
             wSo.FindProperty("_handGunVisual").objectReferenceValue = gunVisual;
+            if (muzzleTransform != null)
+                wSo.FindProperty("_muzzleTransform").objectReferenceValue = muzzleTransform;
             var bulletPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(BulletPackPrefab01Path);
             if (bulletPrefab != null)
                 wSo.FindProperty("_bulletVisualPrefab").objectReferenceValue = bulletPrefab;
+            var bulletScale = wSo.FindProperty("_bulletVisualScale");
+            if (bulletScale != null)
+                bulletScale.floatValue = 56f;
+            var bulletEuler = wSo.FindProperty("_bulletVisualEulerOffset");
+            if (bulletEuler != null)
+                bulletEuler.vector3Value = new Vector3(90f, 0f, 0f);
             wSo.ApplyModifiedPropertiesWithoutUndo();
 
-            UnityChanUrpMaterialRemapUtility.RemapRenderersUnder(player);
+            if (fpsViewmodelUnderCamera && viewmodelRootGo != null)
+                FpsViewmodelRenderingSetup.Apply(cam, viewmodelRootGo);
 
-            return player;
+            UnityChanUrpMaterialRemapUtility.RemapRenderersUnder(player);
         }
 
+        /// <summary>프로토타입 씬의 CC 높이(기본 1.35m) 대비 비율로 뷰모델/손 총 스케일을 맞춥니다.</summary>
+        const float ReferenceCharacterControllerHeight = 1.35f;
+
+        static float GunScaleMulFromCharacter(GameObject player)
+        {
+            var cc = player.GetComponent<CharacterController>();
+            if (cc == null)
+                return 1f;
+            return Mathf.Clamp(cc.height / ReferenceCharacterControllerHeight, 0.82f, 1.28f);
+        }
+
+        static void ComputeFpsViewmodelGunLayout(GameObject player, out Vector3 localPos, out Quaternion localRot,
+            out Vector3 localScale)
+        {
+            var mul = GunScaleMulFromCharacter(player);
+            localPos = new Vector3(0.33f, -0.23f, 0.52f) * mul;
+            localRot = Quaternion.Euler(2f, 94f, -1.5f);
+            localScale = Vector3.one * (0.2f * mul);
+        }
 
         static void StripBakedPrototypeRigFromPlayerRoot(GameObject player)
         {
@@ -399,7 +615,8 @@ namespace VRProject.EditorTools
             for (var i = t.childCount - 1; i >= 0; i--)
             {
                 var ch = t.GetChild(i);
-                if (ch.name == "CameraPivot" || ch.name == "HUD")
+                if (ch.name == "CameraPivot" || ch.name == "HUD" || ch.name == "Main Camera" ||
+                    ch.name == "FpsWeaponViewmodel")
                     UnityEngine.Object.DestroyImmediate(ch.gameObject);
             }
 
@@ -432,6 +649,10 @@ namespace VRProject.EditorTools
             typeof(PrototypeAimSpineTwist),
             typeof(PrototypeMantleProbe),
             typeof(UnityChanLocomotionAnimatorBridge),
+            typeof(PrototypeFirstPersonCosmeticCull),
+            typeof(DyrdaFirstPersonMotorAdapter),
+            typeof(FirstPersonController),
+            typeof(InputActionBasedFirstPersonControllerInput),
             typeof(PrototypeThirdPersonPlayer),
         };
 
@@ -449,12 +670,75 @@ namespace VRProject.EditorTools
             }
         }
 
+        static Transform CreateWeaponFirePointUnderGun(GameObject gunVisual)
+        {
+            var gunRoot = gunVisual.transform;
+            foreach (var tr in gunRoot.GetComponentsInChildren<Transform>(true))
+            {
+                var n = tr.name.ToLowerInvariant();
+                if (n.Contains("muzzle") || n.Contains("firepoint") || n.Contains("fire_point") || n.Contains("barrel_tip"))
+                    return tr;
+            }
+
+            var renderers = gunVisual.GetComponentsInChildren<Renderer>(true);
+            if (renderers.Length == 0)
+            {
+                var fp = new GameObject("WeaponFirePoint");
+                fp.transform.SetParent(gunRoot, false);
+                fp.transform.localPosition = new Vector3(0f, 0f, 0.35f);
+                fp.transform.localRotation = Quaternion.identity;
+                return fp.transform;
+            }
+
+            var b = renderers[0].bounds;
+            for (var i = 1; i < renderers.Length; i++)
+                b.Encapsulate(renderers[i].bounds);
+
+            var forward = gunRoot.forward;
+            var c = b.center;
+            var e = b.extents;
+            var corners = new Vector3[8];
+            var idx = 0;
+            for (var x = -1f; x <= 1f; x += 2f)
+            for (var y = -1f; y <= 1f; y += 2f)
+            for (var z = -1f; z <= 1f; z += 2f)
+                corners[idx++] = c + new Vector3(e.x * x, e.y * y, e.z * z);
+
+            var best = corners[0];
+            var bestDot = float.MinValue;
+            foreach (var p in corners)
+            {
+                var d = Vector3.Dot(p - b.center, forward);
+                if (d > bestDot)
+                {
+                    bestDot = d;
+                    best = p;
+                }
+            }
+
+            var go = new GameObject("WeaponFirePoint");
+            go.transform.position = best;
+            go.transform.rotation = Quaternion.LookRotation(forward, gunRoot.up);
+            go.transform.SetParent(gunRoot, true);
+            return go.transform;
+        }
+
+        static Transform CreateToyGunFirePoint(Transform gunRoot)
+        {
+            var fp = new GameObject("WeaponFirePoint");
+            fp.transform.SetParent(gunRoot, false);
+            fp.transform.localPosition = new Vector3(0f, 0f, 0.12f);
+            fp.transform.localRotation = Quaternion.identity;
+            return fp.transform;
+        }
+
         static Transform FindHandBone(Transform root)
         {
             foreach (var t in root.GetComponentsInChildren<Transform>(true))
             {
                 var n = t.name.ToLowerInvariant();
-                if ((n.Contains("hand") && (n.Contains("r") || n.Contains("right"))) || n.Contains("hand_r") || n.Contains("right_hand"))
+                if ((n.Contains("hand") && (n.Contains("r") || n.Contains("right"))) || n.Contains("hand_r") ||
+                    n.Contains("right_hand"))
                     return t;
             }
 
@@ -515,7 +799,8 @@ namespace VRProject.EditorTools
                 root.transform, "LineRight", new Vector2(0f, 0.5f), new Vector2(9f, 2f), Vector2.zero);
 
             var so = new SerializedObject(br);
-            so.FindProperty("_player").objectReferenceValue = player.GetComponent<PrototypeThirdPersonPlayer>();
+            so.FindProperty("_locomotionMotor").objectReferenceValue =
+                UnityChanLocomotionMotorResolver.ResolveMotorBehaviourOn(player);
             so.FindProperty("_weapon").objectReferenceValue = player.GetComponent<OsFpsInspiredWeapon>();
             so.FindProperty("_dot").objectReferenceValue = dotRt;
             so.FindProperty("_lineTop").objectReferenceValue = lineTopRt;

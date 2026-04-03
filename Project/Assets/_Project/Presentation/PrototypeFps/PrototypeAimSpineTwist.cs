@@ -20,12 +20,12 @@ namespace VRProject.Presentation.PrototypeFps
         [SerializeField] float _smooth = 14f;
 
         Quaternion _baseLocal;
-        PrototypeThirdPersonPlayer _player;
+        IUnityChanLocomotionMotor _motor;
         OsFpsInspiredWeapon _weapon;
 
         void Awake()
         {
-            _player = GetComponent<PrototypeThirdPersonPlayer>();
+            _motor = UnityChanLocomotionMotorResolver.ResolveOn(gameObject);
             _weapon = GetComponent<OsFpsInspiredWeapon>();
             if (_spine == null)
                 _spine = FindChildRecursive(transform, "Character1_Spine1");
@@ -37,10 +37,10 @@ namespace VRProject.Presentation.PrototypeFps
 
         void LateUpdate()
         {
-            if (_spine == null || _camera == null || _player == null)
+            if (_spine == null || _camera == null || _motor == null)
                 return;
 
-            if (!_player.IsAiming)
+            if (!_motor.IsAiming)
             {
                 _spine.localRotation = Quaternion.Slerp(_spine.localRotation, _baseLocal, Time.deltaTime * _smooth);
                 return;

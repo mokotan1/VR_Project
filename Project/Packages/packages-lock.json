@@ -10,6 +10,13 @@
       },
       "hash": "3dd5ac77428608ce09015c88054bc103bb80eba9"
     },
+    "com.neuecc.unirx": {
+      "version": "https://github.com/neuecc/UniRx.git?path=Assets/Plugins/UniRx/Scripts",
+      "depth": 0,
+      "source": "git",
+      "dependencies": {},
+      "hash": "6baeccf6c544c155497164327cca72f28163a578"
+    },
     "com.unity.ai.navigation": {
       "version": "2.0.11",
       "depth": 0,
@@ -316,6 +323,14 @@
         "com.unity.xr.legacyinputhelpers": "2.1.2"
       },
       "url": "https://packages.unity.com"
+    },
+    "dev.dyrda.first-person-controller": {
+      "version": "file:dev.dyrda.first-person-controller",
+      "depth": 0,
+      "source": "embedded",
+      "dependencies": {
+        "com.unity.inputsystem": "1.0.1"
+      }
     },
     "com.unity.modules.accessibility": {
       "version": "1.0.0",

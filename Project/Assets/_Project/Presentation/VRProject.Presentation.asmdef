@@ -8,7 +8,9 @@
         "Unity.XR.Interaction.Toolkit",
         "Unity.InputSystem",
         "Unity.XR.CoreUtils",
-        "UnityEngine.UI"
+        "UnityEngine.UI",
+        "UniRx",
+        "DyrdaDev.FirstPersonController.Runtime"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
