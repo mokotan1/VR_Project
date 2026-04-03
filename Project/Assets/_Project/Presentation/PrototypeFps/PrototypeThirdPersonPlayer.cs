@@ -14,6 +14,13 @@ namespace VRProject.Presentation.PrototypeFps
         [SerializeField] float _cameraDistance = 3.4f;
         [SerializeField] float _lookTargetHeight = 1.35f;
         [SerializeField] float _cameraSideOffset = 0.28f;
+        [Tooltip("RMB 조준 시 카메라 거리 (멀수록 캐릭터가 작아져 머리가 십자선을 덜 가림).")]
+        [SerializeField] float _aimCameraDistance = 4.35f;
+        [Tooltip("조준 시 좌우 오프셋 (어깨 쪽으로 더 밀어 중앙 시야에서 머리를 치움).")]
+        [SerializeField] float _aimCameraSideOffset = 0.62f;
+        [Tooltip("조준 시 LookAt 높이. 기본보다 낮추면 카메라가 약간 아래를 보며 머리가 화면 위쪽으로 밀림.")]
+        [SerializeField] float _aimLookTargetHeight = 1.02f;
+        [SerializeField] float _aimCameraBlendSpeed = 7f;
         [SerializeField] float _defaultFieldOfView = 60f;
         [SerializeField] float _aimFieldOfView = 48f;
         [SerializeField] float _fovLerpSpeed = 10f;
@@ -29,6 +36,7 @@ namespace VRProject.Presentation.PrototypeFps
         bool _controlsEnabled = true;
         bool _motorLocked;
         CharacterController _characterController;
+        float _aimCameraBlend;
 
         /// <summary>Mecanim axes: x = Direction (strafe), y = Speed (Unity-Chan Locomotions).</summary>
         public Vector2 LocomotionAxes => _lastLocomotionAxes;
@@ -178,9 +186,16 @@ namespace VRProject.Presentation.PrototypeFps
             if (_camera == null || _cameraPivot == null)
                 return;
 
-            var side = _cameraPivot.right * _cameraSideOffset;
-            _camera.transform.position = _cameraPivot.position + side + _cameraPivot.forward * (-_cameraDistance);
-            var lookAt = transform.position + Vector3.up * _lookTargetHeight;
+            var aimTarget = _controlsEnabled && IsAiming ? 1f : 0f;
+            _aimCameraBlend = Mathf.MoveTowards(_aimCameraBlend, aimTarget, Time.deltaTime * _aimCameraBlendSpeed);
+
+            var dist = Mathf.Lerp(_cameraDistance, _aimCameraDistance, _aimCameraBlend);
+            var sideOff = Mathf.Lerp(_cameraSideOffset, _aimCameraSideOffset, _aimCameraBlend);
+            var lookH = Mathf.Lerp(_lookTargetHeight, _aimLookTargetHeight, _aimCameraBlend);
+
+            var side = _cameraPivot.right * sideOff;
+            _camera.transform.position = _cameraPivot.position + side + _cameraPivot.forward * (-dist);
+            var lookAt = transform.position + Vector3.up * lookH;
             _camera.transform.LookAt(lookAt, Vector3.up);
         }
     }

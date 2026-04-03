@@ -57,7 +57,7 @@ namespace VRProject.EditorTools
 
                 mat.shader = temp.shader;
                 mat.CopyPropertiesFromMaterial(temp);
-                Object.DestroyImmediate(temp);
+                UnityEngine.Object.DestroyImmediate(temp);
                 EditorUtility.SetDirty(mat);
                 count++;
             }

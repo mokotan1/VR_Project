@@ -28,11 +28,9 @@ namespace VRProject.EditorTools
         const string BulletPackPrefab02Path = "Assets/DuNguyn/Bullets Pack/Prefabs/SM_Bullet_02.prefab";
         const string BulletPackPrefab03Path = "Assets/DuNguyn/Bullets Pack/Prefabs/SM_Bullet_03.prefab";
         const string BulletPackPrefab010Path = "Assets/DuNguyn/Bullets Pack/Prefabs/SM_Bullet_010.prefab";
-        const string OccaCrosshair19Path = "Assets/OccaSoftware/Crosshairs/Art/Textures/Crosshair_19.png";
 
         /// <summary>Bullets Pack meshes are small in source assets; keep scale modest so the pile reads as table props.</summary>
         const float BulletPackDecorationScale = 2.5f;
-        const float HudCrosshairPixelSize = 52f;
 
         [MenuItem("VR Project/Scenes/Create Unity-Chan Prototype FPS")]
         public static void CreateScene()
@@ -463,31 +461,73 @@ namespace VRProject.EditorTools
             return null;
         }
 
-        static GameObject BuildHudCrosshair(Transform canvasTransform)
+        static (RectTransform rt, Image img) CreateBrCrossLine(
+            Transform parent,
+            string name,
+            Vector2 pivot,
+            Vector2 sizeDelta,
+            Vector2 anchoredPosition)
         {
-            var root = new GameObject("Crosshair");
+            var go = new GameObject(name);
+            go.transform.SetParent(parent, false);
+            var lineRt = go.AddComponent<RectTransform>();
+            lineRt.anchorMin = lineRt.anchorMax = new Vector2(0.5f, 0.5f);
+            lineRt.pivot = pivot;
+            lineRt.anchoredPosition = anchoredPosition;
+            lineRt.sizeDelta = sizeDelta;
+            var lineImg = go.AddComponent<Image>();
+            lineImg.color = Color.white;
+            lineImg.raycastTarget = false;
+            return (lineRt, lineImg);
+        }
+
+        /// <summary>PUBG-style dynamic crosshair (dot + four bars); spread driven at runtime by <see cref="BattleRoyaleStyleCrosshair"/>.</summary>
+        static GameObject BuildBattleRoyaleCrosshair(Transform canvasTransform, GameObject player)
+        {
+            var root = new GameObject("Crosshair_BattleRoyale");
             root.transform.SetParent(canvasTransform, false);
-            var rt = root.AddComponent<RectTransform>();
-            rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
-            rt.pivot = new Vector2(0.5f, 0.5f);
-            rt.anchoredPosition = Vector2.zero;
-            rt.sizeDelta = new Vector2(HudCrosshairPixelSize, HudCrosshairPixelSize);
+            var rootRt = root.AddComponent<RectTransform>();
+            rootRt.anchorMin = rootRt.anchorMax = new Vector2(0.5f, 0.5f);
+            rootRt.pivot = new Vector2(0.5f, 0.5f);
+            rootRt.anchoredPosition = Vector2.zero;
+            rootRt.sizeDelta = new Vector2(280f, 280f);
 
-            var imgGo = new GameObject("Crosshair_Occa19");
-            imgGo.transform.SetParent(root.transform, false);
-            var irt = imgGo.AddComponent<RectTransform>();
-            irt.anchorMin = irt.anchorMax = new Vector2(0.5f, 0.5f);
-            irt.pivot = new Vector2(0.5f, 0.5f);
-            irt.anchoredPosition = Vector2.zero;
-            irt.sizeDelta = new Vector2(HudCrosshairPixelSize, HudCrosshairPixelSize);
+            var br = root.AddComponent<BattleRoyaleStyleCrosshair>();
 
-            var raw = imgGo.AddComponent<RawImage>();
-            var tex = AssetDatabase.LoadAssetAtPath<Texture2D>(OccaCrosshair19Path);
-            raw.texture = tex;
-            raw.color = Color.white;
-            raw.raycastTarget = false;
-            if (tex == null)
-                Debug.LogWarning("[VR Project] Crosshair texture missing: " + OccaCrosshair19Path);
+            var dotGo = new GameObject("Dot");
+            dotGo.transform.SetParent(root.transform, false);
+            var dotRt = dotGo.AddComponent<RectTransform>();
+            dotRt.anchorMin = dotRt.anchorMax = new Vector2(0.5f, 0.5f);
+            dotRt.pivot = new Vector2(0.5f, 0.5f);
+            dotRt.anchoredPosition = Vector2.zero;
+            dotRt.sizeDelta = new Vector2(4f, 4f);
+            var dotImg = dotGo.AddComponent<Image>();
+            dotImg.color = Color.white;
+            dotImg.raycastTarget = false;
+
+            var (lineTopRt, lineTopImg) = CreateBrCrossLine(
+                root.transform, "LineTop", new Vector2(0.5f, 0f), new Vector2(2f, 9f), Vector2.zero);
+            var (lineBottomRt, lineBottomImg) = CreateBrCrossLine(
+                root.transform, "LineBottom", new Vector2(0.5f, 1f), new Vector2(2f, 9f), Vector2.zero);
+            var (lineLeftRt, lineLeftImg) = CreateBrCrossLine(
+                root.transform, "LineLeft", new Vector2(1f, 0.5f), new Vector2(9f, 2f), Vector2.zero);
+            var (lineRightRt, lineRightImg) = CreateBrCrossLine(
+                root.transform, "LineRight", new Vector2(0f, 0.5f), new Vector2(9f, 2f), Vector2.zero);
+
+            var so = new SerializedObject(br);
+            so.FindProperty("_player").objectReferenceValue = player.GetComponent<PrototypeThirdPersonPlayer>();
+            so.FindProperty("_weapon").objectReferenceValue = player.GetComponent<OsFpsInspiredWeapon>();
+            so.FindProperty("_dot").objectReferenceValue = dotRt;
+            so.FindProperty("_lineTop").objectReferenceValue = lineTopRt;
+            so.FindProperty("_lineBottom").objectReferenceValue = lineBottomRt;
+            so.FindProperty("_lineLeft").objectReferenceValue = lineLeftRt;
+            so.FindProperty("_lineRight").objectReferenceValue = lineRightRt;
+            so.FindProperty("_dotImage").objectReferenceValue = dotImg;
+            so.FindProperty("_lineTopImage").objectReferenceValue = lineTopImg;
+            so.FindProperty("_lineBottomImage").objectReferenceValue = lineBottomImg;
+            so.FindProperty("_lineLeftImage").objectReferenceValue = lineLeftImg;
+            so.FindProperty("_lineRightImage").objectReferenceValue = lineRightImg;
+            so.ApplyModifiedPropertiesWithoutUndo();
 
             return root;
         }
@@ -566,6 +606,26 @@ namespace VRProject.EditorTools
             PlaceBullet(BulletPackPrefab01Path, new Vector3(-0.05f, 0.032f, -0.06f), new Vector3(40f, 120f, 20f));
         }
 
+        static Text CreateHudText(Transform parent, string name, TextAnchor align, int fontSize, Vector2 anchorMin, Vector2 anchorMax, Vector2 pivot, Vector2 anchoredPosition, Vector2 sizeDelta)
+        {
+            var go = new GameObject(name);
+            go.transform.SetParent(parent, false);
+            var rt = go.AddComponent<RectTransform>();
+            rt.anchorMin = anchorMin;
+            rt.anchorMax = anchorMax;
+            rt.pivot = pivot;
+            rt.anchoredPosition = anchoredPosition;
+            rt.sizeDelta = sizeDelta;
+            var txt = go.AddComponent<Text>();
+            txt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            if (txt.font == null)
+                txt.font = Font.CreateDynamicFontFromOSFont("Arial", 16);
+            txt.fontSize = fontSize;
+            txt.color = Color.white;
+            txt.alignment = align;
+            return txt;
+        }
+
         static void WireHud(GameObject player)
         {
             var canvasGo = new GameObject("HUD");
@@ -575,29 +635,48 @@ namespace VRProject.EditorTools
             canvasGo.AddComponent<CanvasScaler>();
             canvasGo.AddComponent<GraphicRaycaster>();
 
-            var crosshairGo = BuildHudCrosshair(canvasGo.transform);
+            var crosshairGo = BuildBattleRoyaleCrosshair(canvasGo.transform, player);
 
-            var textGo = new GameObject("Status");
-            textGo.transform.SetParent(canvasGo.transform, false);
-            var rt = textGo.AddComponent<RectTransform>();
-            rt.anchorMin = new Vector2(0f, 1f);
-            rt.anchorMax = new Vector2(1f, 1f);
-            rt.pivot = new Vector2(0.5f, 1f);
-            rt.anchoredPosition = new Vector2(0f, -12f);
-            rt.sizeDelta = new Vector2(-40f, 80f);
-            var txt = textGo.AddComponent<Text>();
-            txt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            if (txt.font == null)
-                txt.font = Font.CreateDynamicFontFromOSFont("Arial", 16);
-            txt.fontSize = 18;
-            txt.color = Color.white;
-            txt.alignment = TextAnchor.UpperCenter;
+            var ammoTxt = CreateHudText(
+                canvasGo.transform,
+                "Ammo_BR",
+                TextAnchor.LowerRight,
+                36,
+                new Vector2(1f, 0f),
+                new Vector2(1f, 0f),
+                new Vector2(1f, 0f),
+                new Vector2(-24f, 20f),
+                new Vector2(200f, 64f));
+
+            var healthTxt = CreateHudText(
+                canvasGo.transform,
+                "Health_BR",
+                TextAnchor.LowerLeft,
+                22,
+                new Vector2(0f, 0f),
+                new Vector2(0f, 0f),
+                new Vector2(0f, 0f),
+                new Vector2(24f, 20f),
+                new Vector2(200f, 40f));
+
+            var hintTxt = CreateHudText(
+                canvasGo.transform,
+                "Hint_BR",
+                TextAnchor.LowerCenter,
+                14,
+                new Vector2(0.5f, 0f),
+                new Vector2(0.5f, 0f),
+                new Vector2(0.5f, 0f),
+                new Vector2(0f, 6f),
+                new Vector2(880f, 52f));
 
             var hud = player.AddComponent<PrototypeFpsHud>();
             var hSo = new SerializedObject(hud);
             hSo.FindProperty("_weapon").objectReferenceValue = player.GetComponent<OsFpsInspiredWeapon>();
             hSo.FindProperty("_health").objectReferenceValue = player.GetComponent<PrototypeFpsPlayerHealth>();
-            hSo.FindProperty("_statusText").objectReferenceValue = txt;
+            hSo.FindProperty("_ammoText").objectReferenceValue = ammoTxt;
+            hSo.FindProperty("_healthText").objectReferenceValue = healthTxt;
+            hSo.FindProperty("_hintText").objectReferenceValue = hintTxt;
             hSo.FindProperty("_crosshairRoot").objectReferenceValue = crosshairGo;
             hSo.ApplyModifiedPropertiesWithoutUndo();
         }

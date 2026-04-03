@@ -28,11 +28,14 @@ namespace VRProject.Presentation.OsFpsInspired
         float _reloadEnds;
         bool _equipped;
         PrototypeThirdPersonPlayer _motor;
+        float _lastFireUnscaledTime = -999f;
 
         public int AmmoInMag => _ammoInMag;
         public int MagSize => _magSize;
         public bool IsReloading => Time.unscaledTime < _reloadEnds;
         public bool IsEquipped => _equipped;
+        /// <summary>For HUD crosshair spread kick (hip-fire feedback).</summary>
+        public float LastFireUnscaledTime => _lastFireUnscaledTime;
 
         void Awake()
         {
@@ -93,6 +96,7 @@ namespace VRProject.Presentation.OsFpsInspired
 
             _nextFire = Time.unscaledTime + _fireCooldown;
             _ammoInMag--;
+            _lastFireUnscaledTime = Time.unscaledTime;
 
             var muzzle = cam.transform.position + cam.transform.forward * _bulletMuzzleForwardOffset;
             var aimDir = cam.transform.forward;

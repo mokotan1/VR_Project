@@ -8,31 +8,47 @@ namespace VRProject.Presentation.PrototypeFps
     {
         [SerializeField] OsFpsInspiredWeapon _weapon;
         [SerializeField] PrototypeFpsPlayerHealth _health;
-        [SerializeField] Text _statusText;
         [SerializeField] GameObject _crosshairRoot;
+        [Tooltip("Bottom-right: ammo / mag (battle royale style).")]
+        [SerializeField] Text _ammoText;
+        [Tooltip("Bottom-left: HP.")]
+        [SerializeField] Text _healthText;
+        [Tooltip("Bottom-center: control hints.")]
+        [SerializeField] Text _hintText;
 
         void Update()
         {
             if (_crosshairRoot != null)
                 _crosshairRoot.SetActive(_weapon == null || _weapon.IsEquipped);
 
-            if (_statusText == null)
+            if (_ammoText != null && _weapon != null)
+            {
+                if (!_weapon.IsEquipped)
+                    _ammoText.text = "—";
+                else if (_weapon.IsReloading)
+                    _ammoText.text = "RELOAD";
+                else
+                    _ammoText.text = $"{_weapon.AmmoInMag} / {_weapon.MagSize}";
+            }
+
+            if (_healthText != null)
+            {
+                var hp = _health != null
+                    ? $"{Mathf.CeilToInt(_health.Health)}"
+                    : "—";
+                _healthText.text = "HP " + hp;
+            }
+
+            if (_hintText == null)
                 return;
 
-            var ammo = _weapon != null
-                ? (_weapon.IsReloading ? "Reloading" : $"{_weapon.AmmoInMag}/{_weapon.MagSize}")
-                : "--";
-
-            var hp = _health != null
-                ? $"{Mathf.CeilToInt(_health.Health)}/{Mathf.CeilToInt(_health.MaxHealth)}"
-                : "--";
-
             var pickup = _weapon != null && !_weapon.IsEquipped
-                ? "\nWalk into the HK416 on the ground to pick it up."
+                ? "Walk into the HK416 to pick up.\n"
                 : string.Empty;
 
-            _statusText.text =
-                $"HP {hp}   Ammo {ammo}\nWASD move   Mouse look   RMB aim   LMB fire   R reload   Esc cursor{pickup}";
+            _hintText.text =
+                pickup +
+                "WASD   Mouse look   RMB aim   LMB fire   R reload   Esc cursor";
         }
     }
 }

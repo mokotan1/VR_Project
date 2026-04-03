@@ -82,7 +82,14 @@ namespace VRProject.Presentation.Rendering
                 for (var i = 0; i < shared.Length; i++)
                 {
                     var m = shared[i];
-                    copy[i] = m != null ? ConvertToUrpLit(m, urpLit) : null;
+                    if (m == null)
+                    {
+                        copy[i] = CreateFallbackUrpLit(urpLit);
+                        replaced = true;
+                        continue;
+                    }
+
+                    copy[i] = ConvertToUrpLit(m, urpLit);
                     if (copy[i] != m)
                         replaced = true;
                 }
@@ -157,11 +164,26 @@ namespace VRProject.Presentation.Rendering
             var n = src.shader.name;
             if (string.IsNullOrEmpty(n))
                 return false;
+            if (n.IndexOf("InternalError", System.StringComparison.OrdinalIgnoreCase) >= 0)
+                return false;
             if (n.IndexOf("Universal Render Pipeline", System.StringComparison.Ordinal) >= 0)
                 return true;
             if (n.IndexOf("HDRP/", System.StringComparison.Ordinal) >= 0)
                 return true;
             return false;
+        }
+
+        /// <summary>URP Lit with flat gray — avoids magenta when a renderer slot has no material.</summary>
+        static Material CreateFallbackUrpLit(Shader urpLit)
+        {
+            var m = new Material(urpLit)
+            {
+                name = "FallbackNullSlot (URP Lit)"
+            };
+            m.SetColor("_BaseColor", new Color(0.45f, 0.45f, 0.48f));
+            m.SetFloat("_Smoothness", 0.35f);
+            m.SetFloat("_Metallic", 0f);
+            return m;
         }
 
         /// <summary>Works even when the source shader is missing (pink material): try common slot names.</summary>
