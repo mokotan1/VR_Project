@@ -91,7 +91,7 @@ namespace VRProject.EditorTools
             if (!EditorSceneManager.SaveScene(scene, ScenePath))
             {
                 Debug.LogError("[VR Project] SaveScene failed — scene was not written. dataPath=" +
-                               Application.dataPath + " path=\"" + ScenePath + "\"");
+                               UnityEngine.Application.dataPath + " path=\"" + ScenePath + "\"");
                 return;
             }
 
@@ -101,7 +101,7 @@ namespace VRProject.EditorTools
             EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
 
             Debug.Log("[VR Project] Unity-Chan prototype FPS saved and opened: " + ScenePath +
-                      " (project dataPath: " + Application.dataPath + "). " +
+                      " (project dataPath: " + UnityEngine.Application.dataPath + "). " +
                       "If nothing changed, confirm Unity is using this project folder. Add Tags Player and Enemy if missing.");
         }
 
@@ -113,7 +113,7 @@ namespace VRProject.EditorTools
             var directoryUnderAssets = Path.GetDirectoryName(relativeUnderAssets);
             if (string.IsNullOrEmpty(directoryUnderAssets))
                 return;
-            var absDir = Path.Combine(Application.dataPath, directoryUnderAssets);
+            var absDir = Path.Combine(UnityEngine.Application.dataPath, directoryUnderAssets);
             if (!Directory.Exists(absDir))
                 Directory.CreateDirectory(absDir);
         }
@@ -301,6 +301,8 @@ namespace VRProject.EditorTools
                 UnityEngine.Object.DestroyImmediate(rb);
 
             DestroyUnityChanMotorComponents(player);
+            // Prefab was previously saved with CameraPivot/HUD/FPS scripts; strip so we add a single clean rig.
+            StripBakedPrototypeRigFromPlayerRoot(player);
 
             var oldCc = player.GetComponent<CharacterController>();
             if (oldCc != null)
@@ -388,6 +390,47 @@ namespace VRProject.EditorTools
             return player;
         }
 
+
+        static void StripBakedPrototypeRigFromPlayerRoot(GameObject player)
+        {
+            var t = player.transform;
+            for (var i = t.childCount - 1; i >= 0; i--)
+            {
+                var ch = t.GetChild(i);
+                if (ch.name == "CameraPivot" || ch.name == "HUD")
+                    UnityEngine.Object.DestroyImmediate(ch.gameObject);
+            }
+
+            foreach (var tr in player.GetComponentsInChildren<Transform>(true))
+            {
+                if (tr == t)
+                    continue;
+                var n = tr.name;
+                if (n == "HandGun_HK416" || n == "ToyGun")
+                    UnityEngine.Object.DestroyImmediate(tr.gameObject);
+            }
+
+            foreach (var compType in PrototypeComponentsOnPlayerRoot)
+            {
+                foreach (var c in player.GetComponents(compType))
+                {
+                    if (c != null)
+                        UnityEngine.Object.DestroyImmediate(c);
+                }
+            }
+        }
+
+        static readonly Type[] PrototypeComponentsOnPlayerRoot =
+        {
+            typeof(PrototypeThirdPersonPlayer),
+            typeof(UnityChanLocomotionAnimatorBridge),
+            typeof(PrototypeMantleProbe),
+            typeof(PrototypeAimSpineTwist),
+            typeof(OsFpsInspiredWeapon),
+            typeof(PrototypeFpsPlayerHealth),
+            typeof(PrototypeFpsPlayerDeathHandler),
+            typeof(PrototypeFpsHud),
+        };
 
         /// <summary>
         /// VRProject.Editor cannot reference Assembly-CSharp (Unity-Chan scripts); strip by type name.
