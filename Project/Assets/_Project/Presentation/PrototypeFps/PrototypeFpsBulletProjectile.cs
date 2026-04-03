@@ -12,13 +12,16 @@ namespace VRProject.Presentation.PrototypeFps
         float _maxDistance;
         Vector3 _spawnPosition;
 
-        public void Launch(Vector3 worldDirection, float speed, float maxDistance)
+        public void Launch(Vector3 worldDirection, float speed, float maxDistance, Vector3 visualEulerOffset = default)
         {
             _direction = worldDirection.sqrMagnitude > 0.0001f ? worldDirection.normalized : Vector3.forward;
             _speed = speed;
             _maxDistance = maxDistance;
             _spawnPosition = transform.position;
-            transform.forward = _direction;
+            if (visualEulerOffset == Vector3.zero)
+                transform.forward = _direction;
+            else
+                transform.rotation = Quaternion.LookRotation(_direction) * Quaternion.Euler(visualEulerOffset);
         }
 
         void Update()

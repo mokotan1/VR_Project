@@ -1,0 +1,22 @@
+---
+description: Canonical Notion 기획서 URL — Git/Unity 구현 반영 시 이 페이지를 우선 동기화한다
+alwaysApply: true
+---
+
+# 캡스톤 기획서 (Notion)
+
+## 기본 페이지
+
+- **제목**: 미스터리 스릴러 게임 캡스톤 기획서 (초안)
+- **URL**: https://www.notion.so/32cea40d2678817b9f32fc52f944c472
+- **페이지 ID** (API·`notion-fetch` / `notion-update-page`): `32cea40d2678817b9f32fc52f944c472`
+
+## 에이전트 동작
+
+사용자가 노션 기획서에 **구현·커밋·프로젝트 변경을 반영**하거나, 기획서와 코드베이스를 **맞춘다**고 하면 **별도 URL을 주지 않는 한 위 URL을 기본 대상**으로 한다.
+
+1. `notion-fetch`로 최신 본문을 읽은 뒤, `git log` / 변경 파일과 비교한다.
+2. `notion-update-page`의 `update_content`로 표·체크리스트·§10 구현 현황 등을 갱신한다. 기존 블록과 **정확히 일치하는 `old_str`**를 쓴다.
+3. 사용자가 **다른 노션 페이지**를 명시하면 그 URL을 우선한다.
+
+관련 하위 페이지(시나리오·그래픽 카탈로그 등)는 본문의 링크·멘션을 따르되, **메인 스펙 동기화의 앵커는 위 URL**이다.

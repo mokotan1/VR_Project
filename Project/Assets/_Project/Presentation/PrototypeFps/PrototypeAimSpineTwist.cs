@@ -1,4 +1,5 @@
 using UnityEngine;
+using VRProject.Presentation.OsFpsInspired;
 
 namespace VRProject.Presentation.PrototypeFps
 {
@@ -12,16 +13,20 @@ namespace VRProject.Presentation.PrototypeFps
         [SerializeField] Transform _spine;
         [SerializeField] float _aimYawWeight = 0.38f;
         [SerializeField] float _aimPitchWeight = 0.15f;
+        [Tooltip("Scale twist while rifle equipped so AR upper-body layer stays primary.")]
+        [SerializeField] float _twistScaleWhenWeaponEquipped = 0.42f;
         [SerializeField] float _maxYaw = 52f;
         [SerializeField] float _maxPitch = 22f;
         [SerializeField] float _smooth = 14f;
 
         Quaternion _baseLocal;
         PrototypeThirdPersonPlayer _player;
+        OsFpsInspiredWeapon _weapon;
 
         void Awake()
         {
             _player = GetComponent<PrototypeThirdPersonPlayer>();
+            _weapon = GetComponent<OsFpsInspiredWeapon>();
             if (_spine == null)
                 _spine = FindChildRecursive(transform, "Character1_Spine1");
             if (_spine == null)
@@ -48,11 +53,13 @@ namespace VRProject.Presentation.PrototypeFps
             if (flatBody.sqrMagnitude < 0.0001f || flatCam.sqrMagnitude < 0.0001f)
                 return;
 
+            var twistMul = _weapon != null && _weapon.IsEquipped ? _twistScaleWhenWeaponEquipped : 1f;
+
             var yaw = Vector3.SignedAngle(flatBody.normalized, flatCam.normalized, Vector3.up);
-            yaw = Mathf.Clamp(yaw, -_maxYaw, _maxYaw) * _aimYawWeight;
+            yaw = Mathf.Clamp(yaw, -_maxYaw, _maxYaw) * (_aimYawWeight * twistMul);
 
             var pitch = -Mathf.Asin(Mathf.Clamp(camF.y, -1f, 1f)) * Mathf.Rad2Deg;
-            pitch = Mathf.Clamp(pitch, -_maxPitch, _maxPitch) * _aimPitchWeight;
+            pitch = Mathf.Clamp(pitch, -_maxPitch, _maxPitch) * (_aimPitchWeight * twistMul);
 
             var twist = Quaternion.Euler(pitch, yaw, 0f);
             _spine.localRotation = Quaternion.Slerp(_spine.localRotation, _baseLocal * twist, Time.deltaTime * _smooth);

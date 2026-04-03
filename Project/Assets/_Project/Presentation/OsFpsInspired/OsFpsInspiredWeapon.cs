@@ -14,6 +14,7 @@ namespace VRProject.Presentation.OsFpsInspired
         [SerializeField] float _bulletVisualScale = 10f;
         [SerializeField] float _bulletSpeed = 95f;
         [SerializeField] float _bulletMuzzleForwardOffset = 0.45f;
+        [SerializeField] Vector3 _bulletVisualEulerOffset = new Vector3(90f, 0f, 0f);
         [SerializeField] bool _requireRightMouseAimToFire = true;
         [SerializeField] float _maxDistance = 120f;
         [SerializeField] int _magSize = 24;
@@ -111,7 +112,7 @@ namespace VRProject.Presentation.OsFpsInspired
             if (_bulletVisualPrefab == null)
                 return;
 
-            var go = Instantiate(_bulletVisualPrefab, position, Quaternion.LookRotation(direction));
+            var go = Instantiate(_bulletVisualPrefab, position, Quaternion.identity);
             go.transform.localScale = Vector3.one * _bulletVisualScale;
             foreach (var col in go.GetComponentsInChildren<Collider>())
                 Destroy(col);
@@ -119,7 +120,7 @@ namespace VRProject.Presentation.OsFpsInspired
             var proj = go.GetComponent<PrototypeFpsBulletProjectile>();
             if (proj == null)
                 proj = go.AddComponent<PrototypeFpsBulletProjectile>();
-            proj.Launch(direction, _bulletSpeed, _maxDistance);
+            proj.Launch(direction, _bulletSpeed, _maxDistance, _bulletVisualEulerOffset);
         }
     }
 }

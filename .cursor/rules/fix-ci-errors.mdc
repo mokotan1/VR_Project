@@ -1,0 +1,79 @@
+---
+description: CI 오류를 자동으로 읽고 수정하는 규칙. "CI 오류 수정해줘", "fix ci errors", "CI 에러 고쳐" 등의 요청 시 활성화됩니다.
+globs:
+  - "**/*.py"
+  - "**/*.cs"
+alwaysApply: false
+---
+
+# CI Error Auto-Fix Rule
+
+## 트리거 키워드
+사용자가 다음과 같은 요청을 하면 이 규칙을 따릅니다:
+- "CI 오류 수정해줘"
+- "CI 에러 고쳐"
+- "fix ci errors"
+- "커밋 오류 수정"
+
+## 워크플로우
+
+### Step 1: 오류 파일 읽기
+`.cursor/errors/errors.json` 파일을 읽어 현재 CI 오류 목록을 파악합니다.
+이 파일이 없다면, 사용자에게 다음 명령을 먼저 실행하라고 안내합니다:
+```
+python scripts/fetch-errors.py
+```
+
+### Step 2: 오류 분석
+errors.json의 각 오류 항목에서:
+- `branch`: 어느 브랜치에서 발생했는지
+- `file`: 오류 파일 경로
+- `line`: 오류 줄 번호
+- `message`: 오류 메시지
+- `type`: 오류 유형 (python_syntax, python_lint, csharp_syntax 등)
+
+### Step 3: 현재 브랜치 확인
+`git branch --show-current`로 현재 브랜치를 확인합니다.
+오류가 다른 브랜치에 있다면 사용자에게 브랜치 전환을 제안합니다.
+
+### Step 4: 오류 수정
+오류 유형별 수정 전략:
+
+**python_syntax**: 구문 오류 → 해당 파일을 읽고 Python 문법 수정
+**python_lint**: 린트 오류 → ruff 규칙에 따라 코드 스타일 수정
+**csharp_syntax**: C# 구문 오류 → Unity C# 코드 문법 수정
+**csharp_brace_mismatch**: 중괄호 불일치 → 누락된 중괄호 추가/제거
+
+각 오류를 수정할 때:
+1. 먼저 해당 파일 전체를 읽어 컨텍스트를 파악
+2. 오류 메시지를 분석하여 원인 파악
+3. 최소한의 변경으로 오류 수정
+4. 기존 코드 스타일과 일관성 유지
+
+### Step 5: 수정 요약
+모든 수정이 끝나면 다음 형식으로 요약합니다:
+
+```
+## CI 오류 수정 완료
+
+| 파일 | 오류 유형 | 수정 내용 |
+|------|----------|----------|
+| path/to/file.py | python_lint | [E501] 줄 길이 초과 수정 |
+| path/to/file.cs | csharp_syntax | 누락된 세미콜론 추가 |
+```
+
+### Step 6: 커밋
+사용자에게 커밋 여부를 확인한 후:
+```
+git add <수정된 파일들>
+git commit -m "[skip ci] fix: CI 오류 자동 수정 - <오류 요약>"
+git push
+```
+
+커밋 메시지에 `[skip ci]`를 포함하여 무한 루프를 방지합니다.
+
+## 주의사항
+- 오류 수정 시 기존 기능을 망가뜨리지 않도록 최소한의 변경만 수행
+- 확실하지 않은 수정은 사용자에게 확인을 요청
+- 보안 관련 파일(.env 등)은 절대 수정하지 않음
+- 수정 후 해당 파일의 린트 체크를 다시 수행하여 새로운 오류가 없는지 확인

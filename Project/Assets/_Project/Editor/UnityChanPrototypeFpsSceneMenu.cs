@@ -30,13 +30,15 @@ namespace VRProject.EditorTools
         const string BulletPackPrefab010Path = "Assets/DuNguyn/Bullets Pack/Prefabs/SM_Bullet_010.prefab";
         const string OccaCrosshair19Path = "Assets/OccaSoftware/Crosshairs/Art/Textures/Crosshair_19.png";
 
-        /// <summary>Bullets Pack meshes are authored very small; demo scene uses ~12x scale.</summary>
-        const float BulletPackDecorationScale = 12f;
+        /// <summary>Bullets Pack meshes are small in source assets; keep scale modest so the pile reads as table props.</summary>
+        const float BulletPackDecorationScale = 2.5f;
         const float HudCrosshairPixelSize = 52f;
 
         [MenuItem("VR Project/Scenes/Create Unity-Chan Prototype FPS")]
         public static void CreateScene()
         {
+            EnsureProjectTagsExist("Player", "Enemy");
+
             var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
 
             var lightGo = new GameObject("Directional Light");
@@ -270,6 +272,8 @@ namespace VRProject.EditorTools
 
                 if (enemyLayer >= 0)
                     SetLayerRecursively(root, enemyLayer);
+
+                root.SetActive(false);
             }
         }
 
@@ -420,16 +424,17 @@ namespace VRProject.EditorTools
             }
         }
 
+        /// <summary>Destroy order: dependents first; <see cref="PrototypeThirdPersonPlayer"/> and CC are removed after this list.</summary>
         static readonly Type[] PrototypeComponentsOnPlayerRoot =
         {
-            typeof(PrototypeThirdPersonPlayer),
-            typeof(UnityChanLocomotionAnimatorBridge),
-            typeof(PrototypeMantleProbe),
-            typeof(PrototypeAimSpineTwist),
+            typeof(PrototypeFpsHud),
+            typeof(PrototypeFpsPlayerDeathHandler),
             typeof(OsFpsInspiredWeapon),
             typeof(PrototypeFpsPlayerHealth),
-            typeof(PrototypeFpsPlayerDeathHandler),
-            typeof(PrototypeFpsHud),
+            typeof(PrototypeAimSpineTwist),
+            typeof(PrototypeMantleProbe),
+            typeof(UnityChanLocomotionAnimatorBridge),
+            typeof(PrototypeThirdPersonPlayer),
         };
 
         /// <summary>
@@ -607,6 +612,37 @@ namespace VRProject.EditorTools
             {
                 Debug.LogWarning("[VR Project] Tag \"" + tag + "\" is not defined. Add it in Tag Manager.");
             }
+        }
+
+        static void EnsureProjectTagsExist(params string[] tags)
+        {
+            var so = new SerializedObject(
+                AssetDatabase.LoadAllAssetsAtPath("ProjectSettings/TagManager.asset")[0]);
+            var tagsProp = so.FindProperty("tags");
+            if (tagsProp == null || !tagsProp.isArray)
+                return;
+
+            foreach (var tag in tags)
+            {
+                if (string.IsNullOrEmpty(tag))
+                    continue;
+                var found = false;
+                for (var i = 0; i < tagsProp.arraySize; i++)
+                {
+                    if (tagsProp.GetArrayElementAtIndex(i).stringValue == tag)
+                    {
+                        found = true;
+                        break;
+                    }
+                }
+
+                if (found)
+                    continue;
+                tagsProp.InsertArrayElementAtIndex(tagsProp.arraySize);
+                tagsProp.GetArrayElementAtIndex(tagsProp.arraySize - 1).stringValue = tag;
+            }
+
+            so.ApplyModifiedProperties();
         }
 
         static void AddToBuildSettings(string scenePath)

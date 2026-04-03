@@ -1,0 +1,4 @@
+# HWP MCP server — install on Windows where Hangul (HWP) is available.
+mcp>=1.2.0
+pywin32>=306; platform_system == "Windows"
+pytest>=8.0.0
