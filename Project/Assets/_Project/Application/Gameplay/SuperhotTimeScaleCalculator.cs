@@ -38,6 +38,25 @@ namespace VRProject.Application.Gameplay
             return minTimeFactor + (maxTimeFactor - minTimeFactor) * t;
         }
 
+
+        /// <summary>
+        /// Desktop playtest: blend keyboard locomotion vs mouse-look intensity into one motion 0..1.
+        /// </summary>
+        public static float FlatBlendedMotion01(
+            float planarSpeedMetersPerSecond,
+            float lookIntensityPerSecond,
+            float planarDeadZoneMps,
+            float planarReferenceMps,
+            float lookDeadZonePerSec,
+            float lookReferencePerSec,
+            float planarWeight,
+            float lookWeight)
+        {
+            var planar01 = Motion01FromSpeed(planarSpeedMetersPerSecond, planarDeadZoneMps, planarReferenceMps);
+            var look01 = Motion01FromSpeed(lookIntensityPerSecond, lookDeadZonePerSec, lookReferencePerSec);
+            return BlendWeightedMotion(planar01, look01, planarWeight, lookWeight);
+        }
+
         public static float SmoothTowards(
             float current,
             float target,

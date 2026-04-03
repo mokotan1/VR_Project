@@ -7,8 +7,7 @@ using VRProject.Infrastructure.DI;
 namespace VRProject.Presentation.Gameplay
 {
     /// <summary>
-    /// Samples HMD vs controller motion with separate weights and dead-zones, then drives <see cref="IGameplayClock"/>.
-    /// When no XR device is active (e.g. flat editor), time factor stays at max for usability.
+    /// Samples motion (XR: HMD + hands; flat: WASD + mouse) then drives <see cref="IGameplayClock"/>.
     /// </summary>
     [DefaultExecutionOrder(-40)]
     [DisallowMultipleComponent]
@@ -37,6 +36,19 @@ namespace VRProject.Presentation.Gameplay
 
         [SerializeField] float _handWeight = 0.15f;
 
+        [Header("Flat playtest (no XR device)")]
+        [SerializeField] float _flatPlanarDeadZone = 0.12f;
+
+        [SerializeField] float _flatPlanarReference = 4.5f;
+
+        [SerializeField] float _flatLookDeadZone = 10f;
+
+        [SerializeField] float _flatLookReference = 220f;
+
+        [SerializeField] float _flatPlanarWeight = 0.55f;
+
+        [SerializeField] float _flatLookWeight = 0.45f;
+
         [Header("Time curve")]
         [SerializeField] float _minTimeFactor = 0.02f;
 
@@ -51,6 +63,7 @@ namespace VRProject.Presentation.Gameplay
         bool _hasPrev;
         float _smoothedTimeFactor;
         float _smoothVelocity;
+        SuperhotFlatFpsController _flatFps;
 
         void Awake()
         {
@@ -66,6 +79,7 @@ namespace VRProject.Presentation.Gameplay
         void OnEnable()
         {
             _hasPrev = false;
+            _flatFps = null;
         }
 
         void Update()
@@ -79,7 +93,7 @@ namespace VRProject.Presentation.Gameplay
 
             if (!XRSettings.isDeviceActive)
             {
-                _clock.BeginFrame(unscaledDt, _maxTimeFactor);
+                DriveFlatPlaytest(unscaledDt);
                 return;
             }
 
@@ -100,7 +114,7 @@ namespace VRProject.Presentation.Gameplay
                 _prevLeft = leftPos;
                 _prevRight = rightPos;
                 _hasPrev = true;
-                _clock.BeginFrame(unscaledDt, _minTimeFactor);
+                _clock.BeginFrame(unscaledDt, _maxTimeFactor);
                 return;
             }
 
@@ -128,6 +142,38 @@ namespace VRProject.Presentation.Gameplay
                 hand01,
                 _headWeight,
                 _handWeight);
+
+            var targetFactor = SuperhotTimeScaleCalculator.ToTimeFactor(blended, _minTimeFactor, _maxTimeFactor);
+            _smoothedTimeFactor = SuperhotTimeScaleCalculator.SmoothTowards(
+                _smoothedTimeFactor,
+                targetFactor,
+                ref _smoothVelocity,
+                _smoothTimeSeconds,
+                unscaledDt);
+
+            _clock.BeginFrame(unscaledDt, _smoothedTimeFactor);
+        }
+
+        void DriveFlatPlaytest(float unscaledDt)
+        {
+            if (_flatFps == null || !_flatFps.isActiveAndEnabled)
+                _flatFps = FindFirstObjectByType<SuperhotFlatFpsController>();
+
+            if (_flatFps == null)
+            {
+                _clock.BeginFrame(unscaledDt, _maxTimeFactor);
+                return;
+            }
+
+            var blended = SuperhotTimeScaleCalculator.FlatBlendedMotion01(
+                _flatFps.LastPlanarSpeedMetersPerSecond,
+                _flatFps.LastLookIntensityPerSecond,
+                _flatPlanarDeadZone,
+                _flatPlanarReference,
+                _flatLookDeadZone,
+                _flatLookReference,
+                _flatPlanarWeight,
+                _flatLookWeight);
 
             var targetFactor = SuperhotTimeScaleCalculator.ToTimeFactor(blended, _minTimeFactor, _maxTimeFactor);
             _smoothedTimeFactor = SuperhotTimeScaleCalculator.SmoothTowards(
@@ -177,6 +223,12 @@ namespace VRProject.Presentation.Gameplay
             _handDeadZoneSpeed = Mathf.Max(0f, _handDeadZoneSpeed);
             _headWeight = Mathf.Max(0f, _headWeight);
             _handWeight = Mathf.Max(0f, _handWeight);
+            _flatPlanarReference = Mathf.Max(0.01f, _flatPlanarReference);
+            _flatLookReference = Mathf.Max(0.01f, _flatLookReference);
+            _flatPlanarDeadZone = Mathf.Max(0f, _flatPlanarDeadZone);
+            _flatLookDeadZone = Mathf.Max(0f, _flatLookDeadZone);
+            _flatPlanarWeight = Mathf.Max(0f, _flatPlanarWeight);
+            _flatLookWeight = Mathf.Max(0f, _flatLookWeight);
             _minTimeFactor = Mathf.Clamp(_minTimeFactor, 0.0001f, 1f);
             _maxTimeFactor = Mathf.Clamp(_maxTimeFactor, _minTimeFactor, 1f);
         }

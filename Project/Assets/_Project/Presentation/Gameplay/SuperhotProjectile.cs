@@ -1,4 +1,5 @@
 using UnityEngine;
+using Unity.XR.CoreUtils;
 using VRProject.Domain.Gameplay;
 using VRProject.Infrastructure.DI;
 
@@ -42,7 +43,15 @@ namespace VRProject.Presentation.Gameplay
 
         void OnTriggerEnter(Collider other)
         {
-            if (other.GetComponentInParent<Unity.XR.CoreUtils.XROrigin>() != null || other.CompareTag("MainCamera"))
+            var health = other.GetComponentInParent<SuperhotPlaytestPlayerHealth>();
+            if (health != null && health.IsAlive)
+            {
+                health.ApplyHit();
+                Destroy(gameObject);
+                return;
+            }
+
+            if (other.GetComponentInParent<XROrigin>() != null || other.CompareTag("MainCamera"))
                 Destroy(gameObject);
         }
     }

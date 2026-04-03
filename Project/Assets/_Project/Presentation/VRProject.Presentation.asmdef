@@ -7,7 +7,8 @@
         "VRProject.Infrastructure",
         "Unity.XR.Interaction.Toolkit",
         "Unity.InputSystem",
-        "Unity.XR.CoreUtils"
+        "Unity.XR.CoreUtils",
+        "UnityEngine.UI"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

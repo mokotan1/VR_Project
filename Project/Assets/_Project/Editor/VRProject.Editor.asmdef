@@ -4,10 +4,12 @@
     "references": [
         "VRProject.Application",
         "VRProject.Presentation",
+        "Unity.AI.Navigation",
         "Unity.XR.CoreUtils",
         "Unity.XR.Interaction.Toolkit",
         "Unity.XR.Management",
-        "Unity.XR.Management.Editor"
+        "Unity.XR.Management.Editor",
+        "UnityEngine.UI"
     ],
     "includePlatforms": [
         "Editor"

@@ -7,6 +7,7 @@ namespace VRProject.Presentation.Gameplay
     /// <summary>
     /// Desktop playtest locomotion: WASD, mouse look, Esc to unlock cursor, E to activate exit portal in view.
     /// </summary>
+    [DefaultExecutionOrder(-50)]
     [RequireComponent(typeof(CharacterController))]
     [DisallowMultipleComponent]
     public sealed class SuperhotFlatFpsController : MonoBehaviour
@@ -21,6 +22,10 @@ namespace VRProject.Presentation.Gameplay
         float _pitch;
         Vector3 _velocity;
         IGameplayClock _clock;
+
+        public float LastPlanarSpeedMetersPerSecond { get; private set; }
+
+        public float LastLookIntensityPerSecond { get; private set; }
 
         void Awake()
         {
@@ -43,9 +48,6 @@ namespace VRProject.Presentation.Gameplay
             Cursor.visible = true;
         }
 
-        /// <summary>
-        /// Keeps vertical look state in sync after an external teleport (e.g. exit portal).
-        /// </summary>
         public void ApplySyncedPitchDegrees(float pitchDegrees)
         {
             _pitch = pitchDegrees;
@@ -65,10 +67,12 @@ namespace VRProject.Presentation.Gameplay
             if (dt <= 0f)
                 return;
 
+            var mx = 0f;
+            var my = 0f;
             if (Cursor.lockState == CursorLockMode.Locked && _cameraTransform != null)
             {
-                var mx = Input.GetAxis("Mouse X") * _mouseSensitivity;
-                var my = Input.GetAxis("Mouse Y") * _mouseSensitivity;
+                mx = Input.GetAxis("Mouse X") * _mouseSensitivity;
+                my = Input.GetAxis("Mouse Y") * _mouseSensitivity;
                 transform.Rotate(0f, mx, 0f);
                 _pitch -= my;
                 _pitch = Mathf.Clamp(_pitch, -89f, 89f);
@@ -87,6 +91,13 @@ namespace VRProject.Presentation.Gameplay
             var move = transform.TransformDirection(input) * _moveSpeed;
             move.y = _velocity.y;
             _characterController.Move(move * dt);
+
+            var vel = _characterController.velocity;
+            LastPlanarSpeedMetersPerSecond = new Vector3(vel.x, 0f, vel.z).magnitude;
+            LastLookIntensityPerSecond =
+                Cursor.lockState == CursorLockMode.Locked
+                    ? new Vector2(mx, my).magnitude / dt
+                    : 0f;
 
             TryInteractExitPortal();
         }

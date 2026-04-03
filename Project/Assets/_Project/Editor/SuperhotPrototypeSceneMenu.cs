@@ -1,15 +1,16 @@
 #if UNITY_EDITOR
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Unity.XR.CoreUtils;
 using UnityEditor;
-using UnityEditor.PackageManager.UI;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.XR.Interaction.Toolkit;
 using UnityEngine.XR.Interaction.Toolkit.Interactables;
 using UnityEngine.XR.Interaction.Toolkit.Locomotion.Teleportation;
+using UnityEngine.UI;
 using VRProject.Application.Gameplay;
 using VRProject.Presentation.Common.Managers;
 using VRProject.Presentation.Gameplay;
@@ -19,6 +20,7 @@ namespace VRProject.EditorTools
     public static class SuperhotPrototypeSceneMenu
     {
         const string ScenePath = "Assets/Scenes/SuperhotPrototype.unity";
+        const string PlayerInteractionTestScenePath = "Assets/Scenes/PlayerInteractionTest.unity";
         const string ProjectilePrefabPath = "Assets/_Project/Presentation/Gameplay/Prefabs/SuperhotProjectile.prefab";
         const string XriPackageJsonPath = "Packages/com.unity.xr.interaction.toolkit/package.json";
 
@@ -26,6 +28,11 @@ namespace VRProject.EditorTools
 
         [MenuItem("VR Project/Scenes/Create Superhot Prototype Scene")]
         public static void CreateSuperhotPrototypeScene()
+        {
+            RunDeferredEditorMenu(CreateSuperhotPrototypeSceneDeferred);
+        }
+
+        static void CreateSuperhotPrototypeSceneDeferred()
         {
             if (!TryEnsureStarterAssetsImported())
             {
@@ -101,64 +108,173 @@ namespace VRProject.EditorTools
                 $"[VR Project] Saved {ScenePath} with XR Origin (XR Rig). Locomotion matches Starter Assets (smooth move / teleport / turn). Floor has TeleportationArea. Add SuperhotLocomotionDisabler on Systems and enable Disable On Awake for room-scale-only SUPERHOT lock.");
         }
 
-        static bool TryEnsureStarterAssetsImported()
+        [MenuItem("VR Project/Scenes/Create Player Interaction Test Scene")]
+        public static void CreatePlayerInteractionTestScene()
         {
-            if (!string.IsNullOrEmpty(ResolveXrRigPrefabAssetPath()))
-                return true;
-
-            var packageInfo = UnityEditor.PackageManager.PackageInfo.FindForAssetPath(XriPackageJsonPath);
-            if (packageInfo == null)
-            {
-                Debug.LogError("[VR Project] com.unity.xr.interaction.toolkit package.json not found.");
-                return false;
-            }
-
-            if (!TryFindStarterAssetsSample(packageInfo, out var starterSample))
-            {
-                Debug.LogError("[VR Project] Starter Assets sample not found in XR Interaction Toolkit package.");
-                return false;
-            }
-
-            if (!starterSample.isImported)
-            {
-                if (!EditorUtility.DisplayDialog(
-                    "Import Starter Assets",
-                    "The XR Interaction Toolkit \"Starter Assets\" sample is required for the VR rig prefab. Import it now?",
-                    "Import",
-                    "Cancel"))
-                    return false;
-
-                starterSample.Import(Sample.ImportOptions.OverridePreviousImports);
-                AssetDatabase.Refresh();
-            }
-
-            if (!string.IsNullOrEmpty(ResolveXrRigPrefabAssetPath()))
-                return true;
-
-            Debug.LogWarning("[VR Project] Starter Assets reported imported but rig prefab missing; re-importing sample.");
-            if (!TryFindStarterAssetsSample(packageInfo, out starterSample))
-                return false;
-            starterSample.Import(Sample.ImportOptions.OverridePreviousImports);
-            AssetDatabase.Refresh();
-            return !string.IsNullOrEmpty(ResolveXrRigPrefabAssetPath());
+            RunDeferredEditorMenu(CreatePlayerInteractionTestSceneDeferred);
         }
 
-        static bool TryFindStarterAssetsSample(UnityEditor.PackageManager.PackageInfo packageInfo, out Sample starterSample)
+        static void CreatePlayerInteractionTestSceneDeferred()
         {
-            starterSample = default;
-            var packageSamples = Sample.FindByPackage(packageInfo.name, packageInfo.version);
-            if (packageSamples == null)
-                return false;
-
-            foreach (var s in packageSamples)
+            if (!TryEnsureStarterAssetsImported())
             {
-                if (s.displayName != "Starter Assets")
-                    continue;
-                starterSample = s;
-                return true;
+                EditorUtility.DisplayDialog(
+                    "Player Interaction Test",
+                    "XR Interaction Toolkit Starter Assets could not be imported or the VR rig prefab is still missing. " +
+                    "Open Window → Package Manager → XR Interaction Toolkit → Samples → import \"Starter Assets\", then run this menu again.",
+                    "OK");
+                return;
             }
 
-            return false;
+            var rigPrefabPath = ResolveXrRigPrefabAssetPath();
+            if (string.IsNullOrEmpty(rigPrefabPath))
+            {
+                EditorUtility.DisplayDialog(
+                    "Player Interaction Test",
+                    "Could not locate \"XR Origin (XR Rig).prefab\" under Starter Assets.",
+                    "OK");
+                return;
+            }
+
+            var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+
+            var lightGo = new GameObject("Directional Light");
+            var light = lightGo.AddComponent<Light>();
+            light.type = LightType.Directional;
+            lightGo.transform.rotation = Quaternion.Euler(50f, -30f, 0f);
+
+            var floor = GameObject.CreatePrimitive(PrimitiveType.Plane);
+            floor.name = "Floor";
+            floor.transform.localScale = new Vector3(10f, 1f, 10f);
+            floor.AddComponent<TeleportationArea>();
+
+            var systems = new GameObject("Systems");
+            systems.AddComponent<GameBootstrapper>();
+            systems.AddComponent<XRInteractionManager>();
+            systems.AddComponent<SuperhotGameplayDriver>();
+            systems.AddComponent<SuperhotPlaytestRigSelector>();
+
+            BuildInteractionPlaygroundProps();
+
+            InstantiateXrRigAndWireSystems(scene, systems, rigPrefabPath);
+            BuildFlatPlaytestRig(XrRigSpawnPosition);
+
+            EditorSceneManager.MarkSceneDirty(scene);
+            EditorSceneManager.SaveScene(scene, PlayerInteractionTestScenePath);
+            AssetDatabase.Refresh();
+            AddSceneToBuildSettingsIfNeeded(PlayerInteractionTestScenePath);
+
+            Debug.Log(
+                $"[VR Project] Saved {PlayerInteractionTestScenePath}. XR: teleport on floor, grab yellow (kinematic) and cyan (physics) cubes. " +
+                "Editor without HMD: flat WASD + mouse; left-click removes red target dummies.");
+        }
+
+        static void BuildInteractionPlaygroundProps()
+        {
+            var root = new GameObject("InteractionPlayground");
+            root.transform.SetPositionAndRotation(Vector3.zero, Quaternion.identity);
+
+            var litShader = Shader.Find("Universal Render Pipeline/Lit");
+
+            var wall = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            wall.name = "Obstacle_Wall";
+            wall.transform.SetParent(root.transform, false);
+            wall.transform.localPosition = new Vector3(0f, 1f, 4f);
+            wall.transform.localScale = new Vector3(6f, 2f, 0.25f);
+            if (litShader != null)
+            {
+                var m = new Material(litShader) { color = new Color(0.35f, 0.38f, 0.42f) };
+                wall.GetComponent<MeshRenderer>().sharedMaterial = m;
+            }
+
+            BuildGrabbableCube(
+                parent: root.transform,
+                name: "Grab_Kinematic",
+                localPosition: new Vector3(1.4f, 0.35f, 2.5f),
+                localScale: Vector3.one * 0.35f,
+                kinematic: true,
+                color: new Color(0.95f, 0.82f, 0.2f));
+
+            BuildGrabbableCube(
+                parent: root.transform,
+                name: "Grab_Dynamic",
+                localPosition: new Vector3(-1.4f, 0.9f, 2.2f),
+                localScale: Vector3.one * 0.28f,
+                kinematic: false,
+                color: new Color(0.2f, 0.75f, 0.9f));
+
+            BuildShootDummy(root.transform, new Vector3(2.2f, 0.75f, 3.5f), litShader);
+            BuildShootDummy(root.transform, new Vector3(-2.2f, 0.75f, 3.5f), litShader);
+        }
+
+        static void BuildGrabbableCube(Transform parent, string name, Vector3 localPosition, Vector3 localScale, bool kinematic, Color color)
+        {
+            var cube = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            cube.name = name;
+            cube.transform.SetParent(parent, false);
+            cube.transform.localPosition = localPosition;
+            cube.transform.localScale = localScale;
+
+            var rb = cube.AddComponent<Rigidbody>();
+            rb.isKinematic = kinematic;
+            if (!kinematic)
+            {
+                rb.mass = 0.45f;
+                rb.linearDamping = 0.5f;
+            }
+
+            cube.AddComponent<XRGrabInteractable>();
+
+            var shader = Shader.Find("Universal Render Pipeline/Lit");
+            if (shader != null)
+            {
+                var m = new Material(shader) { color = color };
+                cube.GetComponent<MeshRenderer>().sharedMaterial = m;
+            }
+        }
+
+        static void BuildShootDummy(Transform parent, Vector3 localPosition, Shader litShader)
+        {
+            var cap = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+            cap.name = "ShootTarget";
+            cap.transform.SetParent(parent, false);
+            cap.transform.localPosition = localPosition;
+            cap.AddComponent<SuperhotEnemy>();
+            if (litShader != null)
+            {
+                var m = new Material(litShader) { color = new Color(0.85f, 0.15f, 0.12f) };
+                cap.GetComponent<MeshRenderer>().sharedMaterial = m;
+            }
+        }
+
+        static void RunDeferredEditorMenu(Action action)
+        {
+            if (action == null)
+                return;
+
+            EditorApplication.delayCall += Deferred;
+
+            void Deferred()
+            {
+                EditorApplication.delayCall -= Deferred;
+                try
+                {
+                    action();
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogError($"[VR Project] Scene menu failed: {ex.Message}");
+                    Debug.LogException(ex);
+                }
+            }
+        }
+
+        static bool TryEnsureStarterAssetsImported()
+        {
+            return StarterAssetsSampleUtility.TryEnsureStarterAssetsImported(
+                XriPackageJsonPath,
+                ResolveXrRigPrefabAssetPath,
+                "[VR Project]");
         }
 
         static string ResolveXrRigPrefabAssetPath()
@@ -217,20 +333,20 @@ namespace VRProject.EditorTools
             weaponSo.ApplyModifiedPropertiesWithoutUndo();
         }
 
-        static void InstantiateXrRigAndWireSystems(Scene scene, GameObject systems, string prefabPath)
+        static GameObject InstantiateXrRigAndWireSystems(Scene scene, GameObject systems, string prefabPath)
         {
             var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
             if (prefab == null)
             {
                 Debug.LogError($"[VR Project] Failed to load rig prefab at {prefabPath}");
-                return;
+                return null;
             }
 
             var rigInstance = PrefabUtility.InstantiatePrefab(prefab, scene) as GameObject;
             if (rigInstance == null)
             {
                 Debug.LogError("[VR Project] InstantiatePrefab returned null for XR rig.");
-                return;
+                return null;
             }
 
             rigInstance.name = "XR Origin (XR Rig)";
@@ -238,7 +354,7 @@ namespace VRProject.EditorTools
 
             foreach (var mgr in rigInstance.GetComponentsInChildren<XRInteractionManager>(true))
             {
-                Object.DestroyImmediate(mgr);
+                UnityEngine.Object.DestroyImmediate(mgr);
             }
 
             var origin = rigInstance.GetComponent<XROrigin>();
@@ -253,6 +369,7 @@ namespace VRProject.EditorTools
             driverSo.FindProperty("_rightController").objectReferenceValue =
                 FindChildTransformByExactName(rigInstance.transform, "Right Controller");
             driverSo.ApplyModifiedPropertiesWithoutUndo();
+            return rigInstance;
         }
 
         static Transform FindChildTransformByExactName(Transform root, string exactName)
@@ -382,7 +499,7 @@ namespace VRProject.EditorTools
             var projGo = GameObject.CreatePrimitive(PrimitiveType.Sphere);
             projGo.name = "SuperhotProjectile";
             projGo.transform.localScale = Vector3.one * 0.12f;
-            Object.DestroyImmediate(projGo.GetComponent<Collider>());
+            UnityEngine.Object.DestroyImmediate(projGo.GetComponent<Collider>());
             var sphere = projGo.AddComponent<SphereCollider>();
             sphere.isTrigger = true;
             var rb = projGo.AddComponent<Rigidbody>();
@@ -393,7 +510,7 @@ namespace VRProject.EditorTools
             projGo.GetComponent<MeshRenderer>().sharedMaterial = pMat;
 
             var prefab = PrefabUtility.SaveAsPrefabAsset(projGo, ProjectilePrefabPath);
-            Object.DestroyImmediate(projGo);
+            UnityEngine.Object.DestroyImmediate(projGo);
             return prefab.GetComponent<SuperhotProjectile>();
         }
 
