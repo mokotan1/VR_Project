@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 using UnityEngine.UI;
 using VRProject.Presentation.OsFpsInspired;
 
@@ -9,9 +9,13 @@ namespace VRProject.Presentation.PrototypeFps
         [SerializeField] OsFpsInspiredWeapon _weapon;
         [SerializeField] PrototypeFpsPlayerHealth _health;
         [SerializeField] Text _statusText;
+        [SerializeField] GameObject _crosshairRoot;
 
         void Update()
         {
+            if (_crosshairRoot != null)
+                _crosshairRoot.SetActive(_weapon == null || _weapon.IsEquipped);
+
             if (_statusText == null)
                 return;
 
@@ -23,7 +27,12 @@ namespace VRProject.Presentation.PrototypeFps
                 ? $"{Mathf.CeilToInt(_health.Health)}/{Mathf.CeilToInt(_health.MaxHealth)}"
                 : "--";
 
-            _statusText.text = $"HP {hp}   Ammo {ammo}\nWASD move   Mouse look   LMB fire   R reload   Esc cursor";
+            var pickup = _weapon != null && !_weapon.IsEquipped
+                ? "\nWalk into the HK416 on the ground to pick it up."
+                : string.Empty;
+
+            _statusText.text =
+                $"HP {hp}   Ammo {ammo}\nWASD move   Mouse look   RMB aim   LMB fire   R reload   Esc cursor{pickup}";
         }
     }
 }

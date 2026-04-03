@@ -28,5 +28,30 @@ namespace VRProject.Tests.EditMode
             Assert.That(r.y, Is.EqualTo(1f).Within(0.001f));
             Assert.That(r.x, Is.EqualTo(0f).Within(0.001f));
         }
+
+        [Test]
+        public void ToUnityChanAnimatorAxes_StrafeOnly_HasPositiveSpeedAndDirection()
+        {
+            var r = LocomotionInputMapper.ToUnityChanAnimatorAxes(new Vector3(1f, 0f, 0f));
+            Assert.That(r.x, Is.EqualTo(1f).Within(0.02f));
+            Assert.That(r.y, Is.GreaterThan(0.1f));
+            Assert.That(r.y, Is.AtMost(0.81f));
+        }
+
+        [Test]
+        public void ToUnityChanAnimatorAxes_BackwardDominant_IsNegativeSpeed()
+        {
+            var r = LocomotionInputMapper.ToUnityChanAnimatorAxes(new Vector3(0f, 0f, -1f));
+            Assert.That(r.x, Is.EqualTo(0f).Within(0.001f));
+            Assert.That(r.y, Is.LessThan(-0.1f));
+        }
+
+        [Test]
+        public void ToUnityChanAnimatorAxes_NoInput_IsZero()
+        {
+            var r = LocomotionInputMapper.ToUnityChanAnimatorAxes(Vector3.zero);
+            Assert.That(r.x, Is.EqualTo(0f).Within(0.001f));
+            Assert.That(r.y, Is.EqualTo(0f).Within(0.001f));
+        }
     }
 }

@@ -32,11 +32,14 @@ namespace VRProject.Presentation.PrototypeFps
             _animator.SetFloat(SpeedId, axes.y);
 
             var info = _animator.GetCurrentAnimatorStateInfo(0);
-            var jumpReady = !_animator.IsInTransition(0) && info.IsName("Base Layer.Locomotion");
+            // Official controller originally only transitioned Locomotion→Jump with a long exit time;
+            // Idle/WalkBack had no jump entry. Controller was extended; allow jump from these states.
+            var jumpReady = !_animator.IsInTransition(0) &&
+                            (info.IsName("Idle") || info.IsName("Locomotion") || info.IsName("WalkBack"));
             if (_player.TryCommitJumpToAnimator(jumpReady))
                 _animator.SetBool(JumpId, true);
 
-            if (info.IsName("Base Layer.Jump") && !_animator.IsInTransition(0))
+            if (info.IsName("Jump") && !_animator.IsInTransition(0))
                 _animator.SetBool(JumpId, false);
         }
     }

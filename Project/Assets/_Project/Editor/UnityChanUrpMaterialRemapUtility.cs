@@ -44,8 +44,15 @@ namespace VRProject.EditorTools
                 }
 
                 if (replaced)
+                {
                     renderer.sharedMaterials = copy;
+                    EditorUtility.SetDirty(renderer);
+                    if (PrefabUtility.IsPartOfPrefabInstance(renderer))
+                        PrefabUtility.RecordPrefabInstancePropertyModifications(renderer);
+                }
             }
+
+            EditorUtility.SetDirty(root);
         }
 
         static Material ConvertToUrpLit(Material src, Shader urpLit)

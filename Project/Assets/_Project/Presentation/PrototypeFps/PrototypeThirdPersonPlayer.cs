@@ -30,6 +30,7 @@ namespace VRProject.Presentation.PrototypeFps
         bool _motorLocked;
         CharacterController _characterController;
 
+        /// <summary>Mecanim axes: x = Direction (strafe), y = Speed (Unity-Chan Locomotions).</summary>
         public Vector2 LocomotionAxes => _lastLocomotionAxes;
         public bool IsGrounded => _characterController != null && _characterController.isGrounded;
         public bool IsAiming =>
@@ -133,7 +134,7 @@ namespace VRProject.Presentation.PrototypeFps
                 if (kb.aKey.isPressed || kb.leftArrowKey.isPressed) input.x -= 1f;
             }
 
-            _lastLocomotionAxes = LocomotionInputMapper.ToUnityChanAxes(input);
+            _lastLocomotionAxes = LocomotionInputMapper.ToUnityChanAnimatorAxes(input);
 
             if (input.sqrMagnitude > 1f)
                 input.Normalize();
