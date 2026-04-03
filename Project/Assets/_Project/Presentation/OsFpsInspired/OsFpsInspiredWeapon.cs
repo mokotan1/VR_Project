@@ -32,6 +32,10 @@ namespace VRProject.Presentation.OsFpsInspired
         [SerializeField] float _reloadDuration = 1.35f;
         [SerializeField] float _damage = 28f;
         [SerializeField] LayerMask _hitMask = Physics.DefaultRaycastLayers;
+        [Tooltip("시야 레이가 머리·캡슐 내부에서 시작할 때 자기 몸 콜라이더에 막히지 않도록 조준 방향으로 레이 원점을 밀어 냅니다.")]
+        [SerializeField] float _hitscanRayStartForwardOffset = 0.12f;
+        [Tooltip("비우면 CharacterController가 붙은 트랜스폼(없으면 이 오브젝트) 아래 콜라이더를 히트스캔에서 무시합니다.")]
+        [SerializeField] Transform _hitscanExclusionRootOverride;
 
         int _ammoInMag;
         float _nextFire;
@@ -40,6 +44,7 @@ namespace VRProject.Presentation.OsFpsInspired
         IUnityChanLocomotionMotor _motor;
         float _lastFireUnscaledTime = -999f;
         Transform _runtimeMuzzleProxy;
+        Transform _hitscanExclusionRoot;
 
         public int AmmoInMag => _ammoInMag;
         public int MagSize => _magSize;
@@ -53,6 +58,9 @@ namespace VRProject.Presentation.OsFpsInspired
             if (_camera == null)
                 _camera = GetComponentInChildren<Camera>();
             _motor = UnityChanLocomotionMotorResolver.ResolveOn(gameObject);
+            _hitscanExclusionRoot = _hitscanExclusionRootOverride != null
+                ? _hitscanExclusionRootOverride
+                : OsFpsInspiredHitscanExclusion.ResolveExclusionRoot(this);
             _equipped = _startEquipped;
             if (_handGunVisual != null)
                 _handGunVisual.SetActive(_equipped);
@@ -230,16 +238,14 @@ namespace VRProject.Presentation.OsFpsInspired
                 dmg.ApplyDamage(_damage, hit.point);
         }
 
-        bool IsPartOfShooterRig(Collider c)
-        {
-            if (c == null)
-                return false;
-            return c.transform == transform || c.transform.IsChildOf(transform);
-        }
+        bool IsPartOfShooterRig(Collider c) =>
+            OsFpsInspiredHitscanExclusion.IsColliderUnderExclusionRoot(c, _hitscanExclusionRoot);
 
-        bool TryFirstWorldHitExcludingSelf(Ray ray, out RaycastHit bestHit)
+        bool TryFirstWorldHitExcludingSelf(Ray viewportAimRay, out RaycastHit bestHit)
         {
-            var hits = Physics.RaycastAll(ray, _maxDistance, _hitMask, QueryTriggerInteraction.Ignore);
+            var ray = OsFpsInspiredHitscanExclusion.BuildBiasedAimRay(
+                viewportAimRay, _hitscanRayStartForwardOffset, _maxDistance, out var castDistance);
+            var hits = Physics.RaycastAll(ray, castDistance, _hitMask, QueryTriggerInteraction.Ignore);
             if (hits.Length == 0)
             {
                 bestHit = default;

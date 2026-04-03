@@ -40,11 +40,9 @@ namespace VRProject.Presentation.PrototypeFps
             if (_spine == null || _camera == null || _motor == null)
                 return;
 
+            // 비조준 시 척추는 Mecanim(로코 + WeaponUpper)에만 맡김. 여기서 바인드 포즈로 당기면 AR 들기 자세·팔이 깨짐.
             if (!_motor.IsAiming)
-            {
-                _spine.localRotation = Quaternion.Slerp(_spine.localRotation, _baseLocal, Time.deltaTime * _smooth);
                 return;
-            }
 
             var camF = _camera.transform.forward;
             var bodyF = transform.forward;

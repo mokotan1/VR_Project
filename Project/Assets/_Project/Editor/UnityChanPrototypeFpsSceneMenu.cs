@@ -22,8 +22,13 @@ namespace VRProject.EditorTools
         /// <summary>Inside <c>Assets/Scenes/UnityChanPrototypeFps/</c> so NavMesh and scene stay together (avoid only opening the folder).</summary>
         const string ScenePath = "Assets/Scenes/UnityChanPrototypeFps/UnityChanPrototypeFps.unity";
 
+        /// <summary>HK416 parented under rig hand (<see cref="WeaponSocketTransformName"/>); camera uses over-shoulder so the grip reads on the skeleton.</summary>
+        const string ScenePathHandHeld = "Assets/Scenes/UnityChanPrototypeFps/UnityChanPrototypeFps_HandHeld.unity";
+
         /// <summary>Same layout as <see cref="ScenePath"/> but locomotion uses dyrdadev First-Person Controller + <see cref="DyrdaFirstPersonMotorAdapter"/> (no mantle).</summary>
         const string ScenePathDyrdaFpc = "Assets/Scenes/UnityChanPrototypeFps/UnityChanPrototypeFps_DyrdaFpc.unity";
+
+        const string WeaponSocketTransformName = "WeaponSocket";
 
         const string LegacyScenePathAtScenesRoot = "Assets/Scenes/UnityChanPrototypeFps.unity";
         const string UnityChanPrefabPath = "Assets/unity-chan!/Unity-chan! Model/Prefabs/for Locomotion/unitychan_dynamic_locomotion.prefab";
@@ -82,7 +87,7 @@ namespace VRProject.EditorTools
 
             SpawnEnemies(coverList.ToArray(), lit);
 
-            var player = BuildUnityChanPlayer(lit);
+            var player = BuildUnityChanPlayer(lit, handHeldWorldGun: false);
             player.transform.position = new Vector3(0f, 0f, -6f);
 
             SpawnWeaponPickup(navRoot.transform, lit, new Vector3(2.2f, 0f, -5.5f));
@@ -107,6 +112,78 @@ namespace VRProject.EditorTools
             Debug.Log("[VR Project] Unity-Chan prototype FPS saved and opened: " + ScenePath +
                       " (project dataPath: " + UnityEngine.Application.dataPath + "). " +
                       "If nothing changed, confirm Unity is using this project folder. Add Tags Player and Enemy if missing.");
+        }
+
+        [MenuItem("VR Project/Scenes/Create Unity-Chan Prototype FPS (Hand-held HK416 on rig)")]
+        public static void CreateSceneHandHeldRifle()
+        {
+            EnsureProjectTagsExist("Player", "Enemy");
+
+            var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+
+            var lightGo = new GameObject("Directional Light");
+            var light = lightGo.AddComponent<Light>();
+            light.type = LightType.Directional;
+            lightGo.transform.rotation = Quaternion.Euler(50f, -30f, 0f);
+
+            var navRoot = new GameObject("NavWorld");
+            var floor = GameObject.CreatePrimitive(PrimitiveType.Plane);
+            floor.name = "Floor";
+            floor.transform.SetParent(navRoot.transform, false);
+            floor.transform.localScale = new Vector3(8f, 1f, 8f);
+            MarkNavigationStatic(floor);
+
+            var lit = ResolveUrpLitShader();
+            if (lit != null)
+                floor.GetComponent<MeshRenderer>().sharedMaterial = new Material(lit) { color = new Color(0.2f, 0.22f, 0.25f) };
+
+            BuildCoverArena(navRoot.transform, lit);
+            BuildParkourJump(navRoot.transform, lit);
+
+            var surface = navRoot.AddComponent<NavMeshSurface>();
+            surface.collectObjects = CollectObjects.Children;
+            surface.BuildNavMesh();
+
+            var systems = new GameObject("Systems");
+            systems.AddComponent<GameBootstrapper>();
+            systems.AddComponent<SuperhotGameplayDriver>();
+
+            var covers = BuildCoverPoints();
+            covers.transform.SetParent(navRoot.transform, false);
+
+            var coverList = new List<Transform>();
+            foreach (Transform t in covers.GetComponentsInChildren<Transform>(true))
+            {
+                if (t != covers.transform && t.name.StartsWith("CoverPoint", StringComparison.Ordinal))
+                    coverList.Add(t);
+            }
+
+            SpawnEnemies(coverList.ToArray(), lit);
+
+            var player = BuildUnityChanPlayer(lit, handHeldWorldGun: true);
+            player.transform.position = new Vector3(0f, 0f, -6f);
+
+            SpawnWeaponPickup(navRoot.transform, lit, new Vector3(2.2f, 0f, -5.5f));
+            SpawnBulletPackDecorations(navRoot.transform, new Vector3(2.55f, 0f, -5.25f));
+
+            WireHud(player);
+
+            EditorSceneManager.MarkSceneDirty(scene);
+            EnsureAssetDirectoryExists(ScenePathHandHeld);
+            if (!EditorSceneManager.SaveScene(scene, ScenePathHandHeld))
+            {
+                Debug.LogError("[VR Project] SaveScene failed — scene was not written. dataPath=" +
+                               UnityEngine.Application.dataPath + " path=\"" + ScenePathHandHeld + "\"");
+                return;
+            }
+
+            AssetDatabase.Refresh();
+            RemoveSceneFromBuildSettingsIfPresent(LegacyScenePathAtScenesRoot);
+            AddToBuildSettings(ScenePathHandHeld);
+            EditorSceneManager.OpenScene(ScenePathHandHeld, OpenSceneMode.Single);
+
+            Debug.Log("[VR Project] Unity-Chan prototype FPS (hand-held HK416) saved and opened: " + ScenePathHandHeld +
+                      ". Over-shoulder camera + rifle under " + WeaponSocketTransformName + " on the rig hand.");
         }
 
         [MenuItem("VR Project/Scenes/Create Unity-Chan Prototype FPS (Dyrda FPC)")]
@@ -358,7 +435,7 @@ namespace VRProject.EditorTools
                 SetLayerRecursively(t.gameObject, layer);
         }
 
-        static GameObject BuildUnityChanPlayer(Shader litShader)
+        static GameObject BuildUnityChanPlayer(Shader litShader, bool handHeldWorldGun)
         {
             var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(UnityChanPrefabPath);
             if (prefab == null)
@@ -412,14 +489,14 @@ namespace VRProject.EditorTools
             mSo.FindProperty("_cameraPivot").objectReferenceValue = camPivot.transform;
             var osc = mSo.FindProperty("_overShoulderCamera");
             if (osc != null)
-                osc.boolValue = false;
+                osc.boolValue = handHeldWorldGun;
             var slo = mSo.FindProperty("_shoulderCameraLocalOffset");
             if (slo != null)
                 slo.vector3Value = new Vector3(0.38f, 1.42f, -2.35f);
             mSo.ApplyModifiedPropertiesWithoutUndo();
 
             player.AddComponent<PrototypeMantleProbe>();
-            AttachSharedUnityChanFpsGameplay(player, cam, litShader, fpsViewmodelUnderCamera: true);
+            AttachSharedUnityChanFpsGameplay(player, cam, litShader, fpsViewmodelUnderCamera: !handHeldWorldGun);
 
             return player;
         }
@@ -494,7 +571,8 @@ namespace VRProject.EditorTools
             var weapon = player.AddComponent<OsFpsInspiredWeapon>();
             var wSo = new SerializedObject(weapon);
             wSo.FindProperty("_camera").objectReferenceValue = cam;
-            wSo.FindProperty("_startEquipped").boolValue = false;
+            // false면 WeaponUpper(Kevin 라이플 상체)가 안 켜져 베이스 로코만 보임 → 변경이 안 보인 것처럼 느껴짐. 픽업 플로우만 쓰면 false로.
+            wSo.FindProperty("_startEquipped").boolValue = true;
             wSo.ApplyModifiedPropertiesWithoutUndo();
 
             player.AddComponent<PrototypeFpsPlayerDeathHandler>();
@@ -506,7 +584,6 @@ namespace VRProject.EditorTools
             Transform gunParent;
             Vector3 gunLocalPos;
             Quaternion gunLocalRot;
-            Vector3 gunLocalScale;
             if (fpsViewmodelUnderCamera)
             {
                 viewmodelRootGo = new GameObject("FpsWeaponViewmodel");
@@ -515,25 +592,19 @@ namespace VRProject.EditorTools
                 viewmodelRootGo.transform.localRotation = Quaternion.identity;
                 viewmodelRootGo.transform.localScale = Vector3.one;
                 gunParent = viewmodelRootGo.transform;
-                ComputeFpsViewmodelGunLayout(player, out gunLocalPos, out gunLocalRot, out gunLocalScale);
+                ComputeFpsViewmodelGunLayout(player, out gunLocalPos, out gunLocalRot);
             }
             else
             {
                 var hand = FindHandBone(player.transform);
-                gunParent = hand != null ? hand : player.transform;
+                gunParent = hand != null ? GetOrCreateWeaponSocket(hand) : player.transform;
                 if (hand != null)
-                {
-                    gunLocalPos = new Vector3(0.04f, 0.02f, 0.03f);
-                    gunLocalRot = Quaternion.Euler(0f, 90f, 0f);
-                }
+                    ComputeHandSocketGunLayout(player, out gunLocalPos, out gunLocalRot);
                 else
                 {
                     gunLocalPos = new Vector3(0.2f, 1.15f, 0.25f);
                     gunLocalRot = Quaternion.Euler(0f, 90f, 0f);
                 }
-
-                var mul = GunScaleMulFromCharacter(player);
-                gunLocalScale = Vector3.one * (0.22f * mul);
             }
 
             gunVisual = TryInstantiatePrefabUnder(Hk416PrefabPath, gunParent);
@@ -544,7 +615,7 @@ namespace VRProject.EditorTools
                 gunVisual.name = "HandGun_HK416";
                 gunVisual.transform.localPosition = gunLocalPos;
                 gunVisual.transform.localRotation = gunLocalRot;
-                gunVisual.transform.localScale = gunLocalScale;
+                gunVisual.transform.localScale = Vector3.one;
                 StripCollidersUnder(gunVisual.transform);
                 UnityChanUrpMaterialRemapUtility.RemapRenderersUnder(gunVisual);
                 gunVisual.SetActive(false);
@@ -600,13 +671,36 @@ namespace VRProject.EditorTools
             return Mathf.Clamp(cc.height / ReferenceCharacterControllerHeight, 0.82f, 1.28f);
         }
 
-        static void ComputeFpsViewmodelGunLayout(GameObject player, out Vector3 localPos, out Quaternion localRot,
-            out Vector3 localScale)
+        static void ComputeFpsViewmodelGunLayout(GameObject player, out Vector3 localPos, out Quaternion localRot)
         {
             var mul = GunScaleMulFromCharacter(player);
             localPos = new Vector3(0.33f, -0.23f, 0.52f) * mul;
             localRot = Quaternion.Euler(2f, 94f, -1.5f);
-            localScale = Vector3.one * (0.2f * mul);
+        }
+
+        /// <summary>
+        /// Local pose of HK416 under <see cref="WeaponSocketTransformName"/>.
+        /// HK416 루트는 통상 총신 +Z; 손 본 ARpose와 맞추기 위해 추가 Y=90°는 총이 옆(+X)을 보므로 쓰지 않음. 미세 조정은 씬의 <c>WeaponSocket</c>.
+        /// </summary>
+        static void ComputeHandSocketGunLayout(GameObject player, out Vector3 localPos, out Quaternion localRot)
+        {
+            var mul = GunScaleMulFromCharacter(player);
+            localPos = new Vector3(0.03f, 0.038f, 0.018f) * mul;
+            localRot = Quaternion.identity;
+        }
+
+        static Transform GetOrCreateWeaponSocket(Transform handBone)
+        {
+            var existing = handBone.Find(WeaponSocketTransformName);
+            if (existing != null)
+                return existing;
+
+            var go = new GameObject(WeaponSocketTransformName);
+            go.transform.SetParent(handBone, false);
+            go.transform.localPosition = Vector3.zero;
+            go.transform.localRotation = Quaternion.identity;
+            go.transform.localScale = Vector3.one;
+            return go.transform;
         }
 
         static void StripBakedPrototypeRigFromPlayerRoot(GameObject player)
@@ -625,7 +719,7 @@ namespace VRProject.EditorTools
                 if (tr == t)
                     continue;
                 var n = tr.name;
-                if (n == "HandGun_HK416" || n == "ToyGun")
+                if (n == "HandGun_HK416" || n == "ToyGun" || n == WeaponSocketTransformName)
                     UnityEngine.Object.DestroyImmediate(tr.gameObject);
             }
 
@@ -732,13 +826,42 @@ namespace VRProject.EditorTools
             return fp.transform;
         }
 
+        static readonly string[] PreferredRightHandBoneNames =
+        {
+            "Character1_RightHand",
+            "RightHand",
+            "hand_r",
+            "Hand_R",
+            "mixamorig:RightHand",
+        };
+
         static Transform FindHandBone(Transform root)
         {
+            foreach (var preferred in PreferredRightHandBoneNames)
+            {
+                foreach (var t in root.GetComponentsInChildren<Transform>(true))
+                {
+                    if (t.name == preferred)
+                        return t;
+                }
+            }
+
             foreach (var t in root.GetComponentsInChildren<Transform>(true))
             {
                 var n = t.name.ToLowerInvariant();
-                if ((n.Contains("hand") && (n.Contains("r") || n.Contains("right"))) || n.Contains("hand_r") ||
-                    n.Contains("right_hand"))
+                if (n == "right_hand" || n.Contains("hand_r") || n.EndsWith("_r_hand", StringComparison.Ordinal))
+                    return t;
+            }
+
+            foreach (var t in root.GetComponentsInChildren<Transform>(true))
+            {
+                var n = t.name.ToLowerInvariant();
+                if (!n.Contains("hand"))
+                    continue;
+                if (n.Contains("finger") || n.Contains("thumb") || n.Contains("index") || n.Contains("middle") ||
+                    n.Contains("ring") || n.Contains("pinky") || n.Contains("little"))
+                    continue;
+                if (n.Contains("r") || n.Contains("right"))
                     return t;
             }
 

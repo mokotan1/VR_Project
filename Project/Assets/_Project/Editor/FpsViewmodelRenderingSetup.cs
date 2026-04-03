@@ -1,3 +1,5 @@
+using System;
+using UnityEditor;
 using UnityEngine;
 using UnityEngine.Rendering.Universal;
 
@@ -75,6 +77,23 @@ namespace VRProject.EditorTools
 
             if (!stack.Contains(overlayCam))
                 stack.Add(overlayCam);
+
+            var syncType = ResolveWeaponOverlaySyncType();
+            if (syncType == null)
+            {
+                Debug.LogWarning(
+                    "[VR Project] FpsWeaponOverlayCameraSync 타입을 로드할 수 없습니다. VRProject.Presentation 어셈블리를 확인하세요.");
+                return;
+            }
+
+            var syncComp = overlayCam.GetComponent(syncType);
+            if (syncComp == null)
+                syncComp = overlayCam.gameObject.AddComponent(syncType);
+            var syncSo = new SerializedObject(syncComp);
+            var mainProp = syncSo.FindProperty("_mainCamera");
+            if (mainProp != null)
+                mainProp.objectReferenceValue = mainCamera;
+            syncSo.ApplyModifiedPropertiesWithoutUndo();
         }
 
         static void SetLayerRecursively(GameObject go, int layer)
@@ -82,6 +101,23 @@ namespace VRProject.EditorTools
             go.layer = layer;
             foreach (Transform t in go.transform)
                 SetLayerRecursively(t.gameObject, layer);
+        }
+
+        static Type ResolveWeaponOverlaySyncType()
+        {
+            const string qualified =
+                "VRProject.Presentation.PrototypeFps.FpsWeaponOverlayCameraSync, VRProject.Presentation";
+            var t = Type.GetType(qualified);
+            if (t != null)
+                return t;
+            foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                if (asm.GetName().Name != "VRProject.Presentation")
+                    continue;
+                return asm.GetType("VRProject.Presentation.PrototypeFps.FpsWeaponOverlayCameraSync");
+            }
+
+            return null;
         }
     }
 }
