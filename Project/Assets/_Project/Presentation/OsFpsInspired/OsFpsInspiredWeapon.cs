@@ -5,6 +5,8 @@ using VRProject.Presentation.PrototypeFps;
 
 namespace VRProject.Presentation.OsFpsInspired
 {
+    /// <summary>다른 컴포넌트(Awake)보다 먼저 실행되어 <see cref="IsEquipped"/>가 브리지에서 안정적으로 읽힙니다.</summary>
+    [DefaultExecutionOrder(-50)]
     public sealed class OsFpsInspiredWeapon : MonoBehaviour
     {
         [SerializeField] Camera _camera;

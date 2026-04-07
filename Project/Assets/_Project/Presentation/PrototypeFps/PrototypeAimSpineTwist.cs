@@ -5,8 +5,9 @@ namespace VRProject.Presentation.PrototypeFps
 {
     /// <summary>
     /// Procedural upper-spine twist toward camera while aiming (UnityChan has no dedicated ADS parameter on Locomotion).
+    /// LateUpdate + 높은 순서: Mecanim이 본을 쓴 뒤에만 척추를 덮어씁니다.
     /// </summary>
-    [DefaultExecutionOrder(100)]
+    [DefaultExecutionOrder(1000)]
     public sealed class PrototypeAimSpineTwist : MonoBehaviour
     {
         [SerializeField] Camera _camera;
@@ -19,7 +20,7 @@ namespace VRProject.Presentation.PrototypeFps
         [SerializeField] float _maxPitch = 22f;
         [SerializeField] float _smooth = 14f;
 
-        Quaternion _baseLocal;
+        Quaternion _smoothedTwist = Quaternion.identity;
         IUnityChanLocomotionMotor _motor;
         OsFpsInspiredWeapon _weapon;
 
@@ -27,12 +28,12 @@ namespace VRProject.Presentation.PrototypeFps
         {
             _motor = UnityChanLocomotionMotorResolver.ResolveOn(gameObject);
             _weapon = GetComponent<OsFpsInspiredWeapon>();
+            if (_camera == null)
+                _camera = GetComponentInChildren<Camera>(true);
             if (_spine == null)
                 _spine = FindChildRecursive(transform, "Character1_Spine1");
             if (_spine == null)
                 _spine = FindChildRecursive(transform, "Character1_Spine");
-            if (_spine != null)
-                _baseLocal = _spine.localRotation;
         }
 
         void LateUpdate()
@@ -40,9 +41,17 @@ namespace VRProject.Presentation.PrototypeFps
             if (_spine == null || _camera == null || _motor == null)
                 return;
 
-            // 비조준 시 척추는 Mecanim(로코 + WeaponUpper)에만 맡김. 여기서 바인드 포즈로 당기면 AR 들기 자세·팔이 깨짐.
+            // Mecanim(베이스 Idle/Loco + WeaponUpper)이 이미 적용된 뒤 호출됨.
+            var animSpineLocal = _spine.localRotation;
+
             if (!_motor.IsAiming)
+            {
+                _smoothedTwist = Quaternion.Slerp(
+                    _smoothedTwist,
+                    Quaternion.identity,
+                    Time.deltaTime * _smooth);
                 return;
+            }
 
             var camF = _camera.transform.forward;
             var bodyF = transform.forward;
@@ -59,8 +68,9 @@ namespace VRProject.Presentation.PrototypeFps
             var pitch = -Mathf.Asin(Mathf.Clamp(camF.y, -1f, 1f)) * Mathf.Rad2Deg;
             pitch = Mathf.Clamp(pitch, -_maxPitch, _maxPitch) * (_aimPitchWeight * twistMul);
 
-            var twist = Quaternion.Euler(pitch, yaw, 0f);
-            _spine.localRotation = Quaternion.Slerp(_spine.localRotation, _baseLocal * twist, Time.deltaTime * _smooth);
+            var targetTwist = Quaternion.Euler(pitch, yaw, 0f);
+            _smoothedTwist = Quaternion.Slerp(_smoothedTwist, targetTwist, Time.deltaTime * _smooth);
+            _spine.localRotation = animSpineLocal * _smoothedTwist;
         }
 
         static Transform FindChildRecursive(Transform root, string exactName)

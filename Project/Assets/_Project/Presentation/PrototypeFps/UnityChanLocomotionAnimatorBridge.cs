@@ -18,6 +18,7 @@ namespace VRProject.Presentation.PrototypeFps
         static readonly int JumpId = Animator.StringToHash("Jump");
         static readonly int WeaponLocomotionBlendId = Animator.StringToHash("WeaponLocomotionBlend");
         static readonly int WeaponFireId = Animator.StringToHash("WeaponFire");
+        static readonly int WeaponEquippedId = Animator.StringToHash("WeaponEquipped");
 
         [SerializeField] float _animatorSpeed = 1.35f;
         [SerializeField] Animator _animator;
@@ -33,6 +34,8 @@ namespace VRProject.Presentation.PrototypeFps
         [SerializeField] float _weaponRunBlendSpeedStart = 0f;
         [SerializeField] float _weaponRunBlendSpeedEnd = 0.38f;
         [SerializeField] float _weaponLocomotionBlendSmoothHz = 8f;
+        [Tooltip("켜면 AnimatorCullingMode.AlwaysAnimate — Scene 뷰·카메라 각도에 따라 애니가 멈춘 것처럼 보이는 현상을 줄입니다.")]
+        [SerializeField] bool _alwaysAnimate = true;
 
         IUnityChanLocomotionMotor _motor;
         OsFpsInspiredWeapon _weapon;
@@ -41,33 +44,81 @@ namespace VRProject.Presentation.PrototypeFps
         float _weaponLocomotionBlendSmoothed;
         float _lastConsumedWeaponFireUnscaledTime = -9999f;
         bool _wasWeaponEquipped;
+        bool _warnedMissingWeaponUpperLayer;
 
         void Awake()
         {
             _motor = UnityChanLocomotionMotorResolver.ResolveOn(gameObject);
             _weapon = GetComponent<OsFpsInspiredWeapon>();
+            RefreshWeaponUpperLayerIndex();
+            if (_weapon != null)
+                _lastConsumedWeaponFireUnscaledTime = _weapon.LastFireUnscaledTime;
+        }
+
+        void OnEnable()
+        {
+            RefreshWeaponUpperLayerIndex();
+            SyncWeaponUpperLayerFromEquippedState(force: true);
+        }
+
+        void Start()
+        {
+            RefreshWeaponUpperLayerIndex();
+            SyncWeaponUpperLayerFromEquippedState(force: true);
+            if (_alwaysAnimate && _animator != null)
+                _animator.cullingMode = AnimatorCullingMode.AlwaysAnimate;
+        }
+
+        void RefreshWeaponUpperLayerIndex()
+        {
             if (_animator == null)
                 _animator = GetComponentInChildren<Animator>();
-            if (_animator != null)
+            if (_animator == null)
+                return;
+
+            _weaponUpperLayerIndex = _animator.GetLayerIndex(WeaponUpperLayerName);
+            if (_weaponUpperLayerIndex < 0 && !_warnedMissingWeaponUpperLayer)
             {
-                _weaponUpperLayerIndex = _animator.GetLayerIndex(WeaponUpperLayerName);
-                if (_weaponUpperLayerIndex < 0)
-                    Debug.LogWarning(
-                        "[UnityChanLocomotionAnimatorBridge] Animator에 '" + WeaponUpperLayerName +
-                        "' 레이어가 없습니다. UnityChanLocomotions 컨트롤러와 weapon upper body mask를 확인하세요.",
-                        _animator);
+                _warnedMissingWeaponUpperLayer = true;
+                Debug.LogWarning(
+                    "[UnityChanLocomotionAnimatorBridge] Animator에 '" + WeaponUpperLayerName +
+                    "' 레이어가 없습니다. 컨트롤러에 레이어·이름·Mask(weapon upper body mask)를 확인하세요.",
+                    _animator);
+            }
+        }
+
+        /// <summary>레이어 인덱스가 늦게 잡히거나 비활성화 후 재활성화될 때 가중치·파라미터를 즉시 맞춥니다.</summary>
+        void SyncWeaponUpperLayerFromEquippedState(bool force)
+        {
+            if (_animator == null)
+                return;
+            if (_weapon == null)
+                _weapon = GetComponent<OsFpsInspiredWeapon>();
+
+            var equipped = _weapon != null && _weapon.IsEquipped;
+            if (force)
+                _wasWeaponEquipped = equipped;
+
+            _animator.SetBool(WeaponEquippedId, equipped);
+
+            if (_weaponUpperLayerIndex < 0)
+                return;
+
+            if (equipped)
+            {
+                var aim = _motor != null && _motor.IsAiming;
+                _weaponUpperWeight = aim ? _weaponAimLayerWeight : _weaponEquippedLayerWeight;
+                _animator.SetLayerWeight(_weaponUpperLayerIndex, _weaponUpperWeight);
+            }
+            else
+            {
+                _weaponUpperWeight = 0f;
+                _weaponLocomotionBlendSmoothed = 0f;
+                _animator.SetLayerWeight(_weaponUpperLayerIndex, 0f);
+                _animator.SetFloat(WeaponLocomotionBlendId, 0f);
             }
 
-            if (_weapon != null)
-            {
-                _lastConsumedWeaponFireUnscaledTime = _weapon.LastFireUnscaledTime;
-                _wasWeaponEquipped = _weapon.IsEquipped;
-                if (_animator != null && _wasWeaponEquipped && _weaponUpperLayerIndex >= 0)
-                {
-                    _weaponUpperWeight = _weaponEquippedLayerWeight;
-                    _animator.SetLayerWeight(_weaponUpperLayerIndex, _weaponUpperWeight);
-                }
-            }
+            _animator.Update(0f);
         }
 
         void Update()
@@ -90,6 +141,8 @@ namespace VRProject.Presentation.PrototypeFps
 
             if (info.IsName("Jump") && !_animator.IsInTransition(0))
                 _animator.SetBool(JumpId, false);
+
+            _animator.SetBool(WeaponEquippedId, _weapon != null && _weapon.IsEquipped);
 
             var equippedNow = _weapon != null && _weapon.IsEquipped;
             if (equippedNow != _wasWeaponEquipped)
