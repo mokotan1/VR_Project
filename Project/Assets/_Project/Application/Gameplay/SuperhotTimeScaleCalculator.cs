@@ -116,6 +116,40 @@ namespace VRProject.Application.Gameplay
         }
 
         /// <summary>
+        /// PC/패드: 정규화된 이동(0~1)·시선(0~1)에 가중치를 곱해 더한 뒤 [minFactor, maxFactor]로 매핑합니다.
+        /// 가중 합이 1을 넘을 수 있어 합성 계수는 [0,1]로 클램프합니다.
+        /// </summary>
+        public static float DesktopAdditiveTargetTimeScale(
+            float minFactor,
+            float maxFactor,
+            float move01,
+            float look01,
+            float moveWeight,
+            float lookWeight)
+        {
+            move01 = Clamp01(move01);
+            look01 = Clamp01(look01);
+            if (maxFactor < minFactor)
+            {
+                var tmp = maxFactor;
+                maxFactor = minFactor;
+                minFactor = tmp;
+            }
+
+            var span = maxFactor - minFactor;
+            if (span <= 1e-6f)
+                return minFactor;
+
+            var combined = move01 * moveWeight + look01 * lookWeight;
+            if (combined < 0f)
+                combined = 0f;
+            if (combined > 1f)
+                combined = 1f;
+
+            return minFactor + span * combined;
+        }
+
+        /// <summary>
         /// 시뮬레이션 dt가 0일 때도 키 입력으로 시간 진행을 풀 수 있도록, 속도와 의도(×이동속도) 중 큰 값을 씁니다.
         /// </summary>
         public static float EffectivePlanarSpeedForTime(

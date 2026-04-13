@@ -7,7 +7,7 @@ namespace VRProject.Presentation.Gameplay
     /// <summary>
     /// Desktop playtest locomotion: WASD, mouse look, Esc to unlock cursor, E to activate exit portal in view.
     /// </summary>
-    [DefaultExecutionOrder(-50)]
+    [DefaultExecutionOrder(-100)]
     [RequireComponent(typeof(CharacterController))]
     [DisallowMultipleComponent]
     public sealed class SuperhotFlatFpsController : MonoBehaviour
@@ -29,6 +29,12 @@ namespace VRProject.Presentation.Gameplay
 
         /// <summary>Horizontal/Vertical 축 기준 평면 이동 의도 0~1. 시뮬레이션 dt와 무관하게 갱신됩니다.</summary>
         public float LastPlanarMoveIntent01 { get; private set; }
+
+        /// <summary>CharacterController 기준 접지(컨트롤러 없으면 false).</summary>
+        public bool IsGrounded => _characterController != null && _characterController.isGrounded;
+
+        /// <summary>공중 — CC가 없으면 false(미정으로 공중 취급 안 함).</summary>
+        public bool IsAirborne => _characterController != null && !_characterController.isGrounded;
 
         public float MoveSpeed => _moveSpeed;
 
@@ -70,7 +76,10 @@ namespace VRProject.Presentation.Gameplay
 
             RefreshPlanarIntentAndSpeed();
 
-            var dt = _clock != null ? _clock.SimulationDeltaTime : Time.deltaTime;
+            var simDt = _clock != null ? _clock.SimulationDeltaTime : Time.deltaTime;
+            // timeScale=0이면 SimulationDeltaTime이 0이 되어 이동이 막히고, 드라이버가 의도·속도를 못 받아 영구 정지됨.
+            // 완전 정지 시에도 이 프레임의 이동만 실시간으로 적용해 시간을 다시 풀 수 있게 함.
+            var dt = simDt > 1e-9f ? simDt : Time.unscaledDeltaTime;
 
             var mx = 0f;
             var my = 0f;
@@ -82,12 +91,6 @@ namespace VRProject.Presentation.Gameplay
                 _pitch -= my;
                 _pitch = Mathf.Clamp(_pitch, -89f, 89f);
                 _cameraTransform.localRotation = Quaternion.Euler(_pitch, 0f, 0f);
-            }
-
-            if (dt <= 0f)
-            {
-                LastLookIntensityPerSecond = 0f;
-                return;
             }
 
             if (_characterController == null)

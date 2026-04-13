@@ -19,6 +19,9 @@ namespace VRProject.Presentation.Gameplay
 
         [SerializeField] float _cooldownSeconds = 2.5f;
 
+        [Tooltip("켜면 쿨다운이 시뮬레이션 시간이 아니라 실시간(슬로모와 무관)으로 누적됩니다.")]
+        [SerializeField] bool _cooldownUsesRealTime;
+
         float _accumulator;
         Unity.XR.CoreUtils.XROrigin _origin;
         IGameplayClock _clock;
@@ -45,9 +48,13 @@ namespace VRProject.Presentation.Gameplay
             if (_projectilePrefab == null || _hmd == null)
                 return;
 
-            var simDt = _clock != null ? _clock.SimulationDeltaTime : Time.deltaTime;
+            float dt;
+            if (_cooldownUsesRealTime)
+                dt = Time.unscaledDeltaTime;
+            else
+                dt = _clock != null ? _clock.SimulationDeltaTime : Time.deltaTime;
 
-            _accumulator += simDt;
+            _accumulator += dt;
             if (_accumulator < _cooldownSeconds)
                 return;
 

@@ -6,7 +6,7 @@ using VRProject.Infrastructure.DI;
 namespace VRProject.Presentation.OsFpsInspired
 {
     [RequireComponent(typeof(CharacterController))]
-    [DefaultExecutionOrder(-45)]
+    [DefaultExecutionOrder(-100)]
     public sealed class OsFpsInspiredPlayerMotor : MonoBehaviour
     {
         [SerializeField] Transform _cameraTransform;
@@ -18,6 +18,7 @@ namespace VRProject.Presentation.OsFpsInspired
         float _pitch;
         Vector3 _velocity;
         IGameplayClock _clock;
+        CharacterController _characterController;
 
         /// <summary>WASD 등 평면 이동 의도 0~1. 시뮬레이션 dt와 무관하게 매 프레임 갱신됩니다.</summary>
         public float LastPlanarMoveIntent01 { get; private set; }
@@ -27,8 +28,15 @@ namespace VRProject.Presentation.OsFpsInspired
 
         public float MoveSpeed => _moveSpeed;
 
+        /// <summary>CharacterController 기준 접지.</summary>
+        public bool IsGrounded => _characterController != null && _characterController.isGrounded;
+
+        /// <summary>공중 — CC가 없으면 false.</summary>
+        public bool IsAirborne => _characterController != null && !_characterController.isGrounded;
+
         void Awake()
         {
+            _characterController = GetComponent<CharacterController>();
             var locator = ServiceLocator.Instance;
             _clock = locator.IsRegistered<IGameplayClock>() ? locator.Resolve<IGameplayClock>() : null;
         }
@@ -67,11 +75,11 @@ namespace VRProject.Presentation.OsFpsInspired
                 _cameraTransform.localRotation = Quaternion.Euler(_pitch, 0f, 0f);
             }
 
-            var dt = _clock != null ? _clock.SimulationDeltaTime : Time.deltaTime;
-            if (dt <= 0f)
-                return;
+            var simDt = _clock != null ? _clock.SimulationDeltaTime : Time.deltaTime;
+            var dt = simDt > 1e-9f ? simDt : Time.unscaledDeltaTime;
 
-            var cc = GetComponent<CharacterController>();
+            var cc = _characterController != null ? _characterController : GetComponent<CharacterController>();
+            _characterController = cc;
             if (cc == null)
                 return;
 
@@ -106,7 +114,7 @@ namespace VRProject.Presentation.OsFpsInspired
 
         void RefreshPlanarSpeedFromController()
         {
-            var cc = GetComponent<CharacterController>();
+            var cc = _characterController != null ? _characterController : GetComponent<CharacterController>();
             if (cc != null)
             {
                 var v = cc.velocity;

@@ -140,5 +140,33 @@ namespace VRProject.Tests.EditMode
             var x = SuperhotTimeScaleCalculator.SmoothTimeScaleLerp(0f, 1f, 0.5f);
             Assert.AreEqual(0.5f, x, 1e-5f);
         }
+
+        [Test]
+        public void DesktopAdditive_Idle_ReturnsMin()
+        {
+            var t = SuperhotTimeScaleCalculator.DesktopAdditiveTargetTimeScale(0.05f, 1f, 0f, 0f, 1f, 0.25f);
+            Assert.AreEqual(0.05f, t, 1e-5f);
+        }
+
+        [Test]
+        public void DesktopAdditive_FullMove_ReachesMax()
+        {
+            var t = SuperhotTimeScaleCalculator.DesktopAdditiveTargetTimeScale(0.05f, 1f, 1f, 0f, 1f, 0.25f);
+            Assert.AreEqual(1f, t, 1e-4f);
+        }
+
+        [Test]
+        public void DesktopAdditive_OnlyLook_ScalesByLookWeight()
+        {
+            var t = SuperhotTimeScaleCalculator.DesktopAdditiveTargetTimeScale(0.05f, 1f, 0f, 1f, 1f, 0.25f);
+            Assert.AreEqual(0.05f + 0.95f * 0.25f, t, 1e-4f);
+        }
+
+        [Test]
+        public void DesktopAdditive_MoveAndLook_ClampCombinedToOne()
+        {
+            var t = SuperhotTimeScaleCalculator.DesktopAdditiveTargetTimeScale(0.05f, 1f, 1f, 1f, 1f, 0.25f);
+            Assert.AreEqual(1f, t, 1e-4f);
+        }
     }
 }
