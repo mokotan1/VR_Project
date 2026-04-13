@@ -22,8 +22,9 @@ namespace VRProject.Tests.EditMode
         [Test]
         public void BlendWeightedMotion_WeightsAverage()
         {
+            // (1*0.8 + 0*0.2) / (0.8+0.2) = 0.8
             var b = SuperhotTimeScaleCalculator.BlendWeightedMotion(1f, 0f, 0.8f, 0.2f);
-            Assert.AreEqual(1f, b, 1e-5f);
+            Assert.AreEqual(0.8f, b, 1e-5f);
         }
 
         [Test]
@@ -82,6 +83,62 @@ namespace VRProject.Tests.EditMode
             for (var i = 0; i < 30; i++)
                 x = SuperhotTimeScaleCalculator.SmoothTowards(x, 1f, ref v, 0.1f, 0.016f);
             Assert.Greater(x, 0.99f);
+        }
+
+        [Test]
+        public void AngularSpeedDegreesPerSecond_90DegreesInOneSecond_Is90()
+        {
+            var w = SuperhotTimeScaleCalculator.AngularSpeedDegreesPerSecond(90f, 1f);
+            Assert.AreEqual(90f, w, 1e-5f);
+        }
+
+        [Test]
+        public void AngularSpeedDegreesPerSecond_ZeroDt_IsZero()
+        {
+            var w = SuperhotTimeScaleCalculator.AngularSpeedDegreesPerSecond(90f, 0f);
+            Assert.AreEqual(0f, w, 1e-5f);
+        }
+
+        [Test]
+        public void TrackerIntensity_CombinesLinearAndAngularWeighted()
+        {
+            var i = SuperhotTimeScaleCalculator.TrackerIntensity(1f, 60f, 0.01f);
+            Assert.AreEqual(1.6f, i, 1e-5f);
+        }
+
+        [Test]
+        public void RootSumSquareThree_UnitAxes_IsSqrt3()
+        {
+            var r = SuperhotTimeScaleCalculator.RootSumSquareThree(1f, 1f, 1f);
+            Assert.AreEqual(1.7320508f, r, 1e-4f);
+        }
+
+        [Test]
+        public void RootSumSquareThree_SingleNonZero_MatchesAbs()
+        {
+            var r = SuperhotTimeScaleCalculator.RootSumSquareThree(2f, 0f, 0f);
+            Assert.AreEqual(2f, r, 1e-5f);
+        }
+
+        [Test]
+        public void SmoothTimeScaleMoveTowards_ReachesTargetWithinOneStep()
+        {
+            var x = SuperhotTimeScaleCalculator.SmoothTimeScaleMoveTowards(0f, 1f, 10f, 0.2f);
+            Assert.AreEqual(1f, x, 1e-5f);
+        }
+
+        [Test]
+        public void SmoothTimeScaleMoveTowards_ClimbsGradually()
+        {
+            var x = SuperhotTimeScaleCalculator.SmoothTimeScaleMoveTowards(0f, 1f, 10f, 0.05f);
+            Assert.AreEqual(0.5f, x, 1e-5f);
+        }
+
+        [Test]
+        public void SmoothTimeScaleLerp_Halfway()
+        {
+            var x = SuperhotTimeScaleCalculator.SmoothTimeScaleLerp(0f, 1f, 0.5f);
+            Assert.AreEqual(0.5f, x, 1e-5f);
         }
     }
 }

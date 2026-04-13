@@ -1,10 +1,87 @@
+using System;
+
 namespace VRProject.Application.Gameplay
 {
+    /// <summary>
+    /// 세 트래커(HMD, 좌·우 컨트롤) 합성 방식.
+    /// </summary>
+    public enum SuperhotCombineThreeTrackersMode
+    {
+        /// <summary>머리/손 채널을 각각 0..1로 만든 뒤 가중 평균.</summary>
+        WeightedBlend01,
+
+        /// <summary>트래커별 intensity를 RSS로 합친 뒤 하나의 속도 구간으로 0..1 매핑.</summary>
+        RootSumSquareMagnitude,
+    }
+
+    /// <summary>양손 intensity를 하나의 "손" 채널로 묶는 방식.</summary>
+    public enum SuperhotHandPairAggregation
+    {
+        Max,
+        Average,
+    }
+
     /// <summary>
     /// Pure SUPERHOT-style blending: weighted HMD vs hands, then map to time factor. No Unity dependencies.
     /// </summary>
     public static class SuperhotTimeScaleCalculator
     {
+        /// <summary>
+        /// 프레임 사이 각변화(도)와 dt로 각속도(도/초)를 구합니다. 드라이버에서 <c>Quaternion.Angle(prev, current)</c>를 넘깁니다.
+        /// </summary>
+        public static float AngularSpeedDegreesPerSecond(float deltaAngleDegrees, float deltaTimeSeconds)
+        {
+            if (deltaTimeSeconds <= 0f || deltaAngleDegrees < 0f)
+                return 0f;
+
+            return deltaAngleDegrees / deltaTimeSeconds;
+        }
+
+        /// <summary>
+        /// 선속도(m/s)와 각속도(도/s)를 하나의 "움직임 강도" 스칼라로 합칩니다. angularWeight는 도/s를 m/s에 대응시키는 튜닝 계수입니다.
+        /// </summary>
+        public static float TrackerIntensity(
+            float linearSpeedMetersPerSecond,
+            float angularDegreesPerSecond,
+            float angularWeightDegreesToMeters)
+        {
+            return linearSpeedMetersPerSecond + angularDegreesPerSecond * angularWeightDegreesToMeters;
+        }
+
+        /// <summary>세 트래커 intensity의 제곱합 제곱근 (유클리드 결합).</summary>
+        public static float RootSumSquareThree(float a, float b, float c)
+        {
+            return (float)Math.Sqrt(a * a + b * b + c * c);
+        }
+
+        /// <summary>
+        /// 목표 시간 배율까지 초당 변화량을 넘지 않도록 이동합니다 (Unity <c>Mathf.MoveTowards</c>와 동일 개념, 순수 수학).
+        /// </summary>
+        public static float SmoothTimeScaleMoveTowards(
+            float current,
+            float target,
+            float maxDeltaPerSecond,
+            float unscaledDeltaTime)
+        {
+            if (unscaledDeltaTime <= 0f)
+                return current;
+
+            var maxDelta = maxDeltaPerSecond * unscaledDeltaTime;
+            if (current < target)
+                return Math.Min(current + maxDelta, target);
+            return (float)Math.Max(current - maxDelta, target);
+        }
+
+        /// <summary>선형 보간으로 현재 값을 목표에 가깝게 (<c>t</c>는 보통 <c>unscaledDeltaTime * rate</c>).</summary>
+        public static float SmoothTimeScaleLerp(float current, float target, float t)
+        {
+            if (t <= 0f)
+                return current;
+            if (t >= 1f)
+                return target;
+            return current + (target - current) * t;
+        }
+
         public static float BlendWeightedMotion(
             float headMotion01,
             float handMotion01,
