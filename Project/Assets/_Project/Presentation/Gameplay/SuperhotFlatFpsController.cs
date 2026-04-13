@@ -6,8 +6,9 @@ namespace VRProject.Presentation.Gameplay
 {
     /// <summary>
     /// Desktop playtest locomotion: WASD, mouse look, Esc to unlock cursor, E to activate exit portal in view.
+    /// <see cref="SuperhotGameplayDriver"/>보다 나중에 실행되어 같은 프레임에서 갱신된 시계를 읽습니다(-80 먼음, 이 스크립트 -50).
     /// </summary>
-    [DefaultExecutionOrder(-100)]
+    [DefaultExecutionOrder(-50)]
     [RequireComponent(typeof(CharacterController))]
     [DisallowMultipleComponent]
     public sealed class SuperhotFlatFpsController : MonoBehaviour
@@ -18,6 +19,16 @@ namespace VRProject.Presentation.Gameplay
         [SerializeField] float _mouseSensitivity = 2f;
         [SerializeField] float _gravity = -18f;
         [SerializeField] float _interactMaxDistance = 4f;
+
+        [Tooltip("SimulationDeltaTime이 거의 0일 때 unscaledDeltaTime으로 이동해 시간을 다시 풀 수 있게 합니다. 끄면 시간이 멈출 때 플레이어도 멈춥니다(적·시계와 정합).")]
+        [SerializeField] bool _allowUnscaledMoveWhenSimStopped = true;
+
+        [Tooltip("켜면 마우스 시점 입력에 LastTimeFactor를 곱해 슬로모에서 회전을 몸 이동에 맞춥니다.")]
+        [SerializeField] bool _scaleMouseLookByTimeFactor = true;
+
+        [Tooltip("시간 배율이 낮아도 시점이 너무 둔해지지 않게 하는 최소 배율(×).")]
+        [Range(0.02f, 1f)]
+        [SerializeField] float _mouseLookTimeFactorMin = 0.12f;
 
         float _pitch;
         Vector3 _velocity;
@@ -77,16 +88,25 @@ namespace VRProject.Presentation.Gameplay
             RefreshPlanarIntentAndSpeed();
 
             var simDt = _clock != null ? _clock.SimulationDeltaTime : Time.deltaTime;
-            // timeScale=0이면 SimulationDeltaTime이 0이 되어 이동이 막히고, 드라이버가 의도·속도를 못 받아 영구 정지됨.
-            // 완전 정지 시에도 이 프레임의 이동만 실시간으로 적용해 시간을 다시 풀 수 있게 함.
-            var dt = simDt > 1e-9f ? simDt : Time.unscaledDeltaTime;
+            // timeScale=0이면 SimulationDeltaTime이 0 — 폴백 켬: 실시간으로만 살짝 움직여 드라이버가 입력을 받게 함. 끔: 적·시계와 동일하게 정지.
+            float dt;
+            if (simDt > 1e-9f)
+                dt = simDt;
+            else if (_allowUnscaledMoveWhenSimStopped)
+                dt = Time.unscaledDeltaTime;
+            else
+                dt = 0f;
+
+            var lookScale = 1f;
+            if (_scaleMouseLookByTimeFactor && _clock != null)
+                lookScale = Mathf.Max(_mouseLookTimeFactorMin, _clock.LastTimeFactor);
 
             var mx = 0f;
             var my = 0f;
             if (Cursor.lockState == CursorLockMode.Locked && _cameraTransform != null)
             {
-                mx = Input.GetAxis("Mouse X") * _mouseSensitivity;
-                my = Input.GetAxis("Mouse Y") * _mouseSensitivity;
+                mx = Input.GetAxis("Mouse X") * _mouseSensitivity * lookScale;
+                my = Input.GetAxis("Mouse Y") * _mouseSensitivity * lookScale;
                 transform.Rotate(0f, mx, 0f);
                 _pitch -= my;
                 _pitch = Mathf.Clamp(_pitch, -89f, 89f);
@@ -108,9 +128,10 @@ namespace VRProject.Presentation.Gameplay
 
             var vel = _characterController.velocity;
             LastPlanarSpeedMetersPerSecond = new Vector3(vel.x, 0f, vel.z).magnitude;
+            var denomForLook = dt > 1e-9f ? dt : Time.unscaledDeltaTime;
             LastLookIntensityPerSecond =
                 Cursor.lockState == CursorLockMode.Locked
-                    ? new Vector2(mx, my).magnitude / dt
+                    ? new Vector2(mx, my).magnitude / Mathf.Max(1e-6f, denomForLook)
                     : 0f;
 
             TryInteractExitPortal();

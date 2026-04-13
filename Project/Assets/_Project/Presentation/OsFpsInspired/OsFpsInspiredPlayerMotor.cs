@@ -6,7 +6,7 @@ using VRProject.Infrastructure.DI;
 namespace VRProject.Presentation.OsFpsInspired
 {
     [RequireComponent(typeof(CharacterController))]
-    [DefaultExecutionOrder(-100)]
+    [DefaultExecutionOrder(-50)]
     public sealed class OsFpsInspiredPlayerMotor : MonoBehaviour
     {
         [SerializeField] Transform _cameraTransform;

@@ -16,6 +16,9 @@ namespace VRProject.Presentation.Gameplay
         [SerializeField] Text _statusText;
         [SerializeField] Text _defeatText;
 
+        [Tooltip("켜면 HP 옆에 simDt·Unity dt·timeScale을 붙여 시간 정합을 바로 확인합니다.")]
+        [SerializeField] bool _showTimeSyncDiagnostics;
+
         SuperhotPlaytestPlayerHealth _health;
         bool _subscribed;
         bool _defeated;
@@ -48,7 +51,16 @@ namespace VRProject.Presentation.Gameplay
             {
                 var hp = _health != null ? $"HP {Mathf.Max(0, _health.RemainingHits)}" : "—";
                 var tf = clock != null ? clock.LastTimeFactor : 1f;
-                _statusText.text = $"{hp}   |   time x{tf:0.00}";
+                var line = $"{hp}   |   time x{tf:0.00}";
+                if (_showTimeSyncDiagnostics && clock != null)
+                {
+                    line +=
+                        $"   |   simDt {clock.SimulationDeltaTime:0.0000}" +
+                        $"   Unity.dt {Time.deltaTime:0.0000}" +
+                        $"   TS {Time.timeScale:0.00}";
+                }
+
+                _statusText.text = line;
             }
 
             if (_defeated && Input.GetKeyDown(KeyCode.R))

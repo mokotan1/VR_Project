@@ -17,6 +17,9 @@ namespace VRProject.Presentation.Gameplay
     /// <summary>
     /// Samples motion (XR: HMD + hands 위치·회전; flat: WASD 평면 이동 — 옵션으로 마우스 시점 포함) 후
     /// Unity 시간 배율·고정 스텝·<see cref="IGameplayClock"/>을 갱신합니다.
+    /// <see cref="_applyUnityTimeScale"/>를 켜 두면 Animator·ParticleSystem·NavMesh 등
+    /// <c>Time.deltaTime</c> 기반 내장 동작이 시간 배율과 한꺼번에 맞춰집니다.
+    /// 애니만 별도 속도가 필요하면 해당 Animator의 <c>speed</c>를 추가로 튜닝합니다.
     /// </summary>
     [DefaultExecutionOrder(-80)]
     [DisallowMultipleComponent]
