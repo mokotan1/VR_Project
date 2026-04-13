@@ -1,6 +1,8 @@
 ﻿using System;
 using UnityEngine;
 using UnityEngine.AI;
+using VRProject.Domain.Gameplay;
+using VRProject.Infrastructure.DI;
 using VRProject.Presentation.OsFpsInspired;
 
 namespace VRProject.Presentation.PrototypeFps
@@ -25,10 +27,15 @@ namespace VRProject.Presentation.PrototypeFps
         Transform[] _coverPoints = Array.Empty<Transform>();
         float _nextShot;
         float _coverUntil;
+        IGameplayClock _clock;
+        float _baseAgentSpeed;
+        float _baseAgentAngularSpeed;
 
         void Awake()
         {
             _agent = GetComponent<NavMeshAgent>();
+            _baseAgentSpeed = _agent.speed;
+            _baseAgentAngularSpeed = _agent.angularSpeed;
             _health = GetComponent<OsFpsInspiredDamageable>();
             var enemyLayer = LayerMask.NameToLayer("Enemy");
             if (enemyLayer >= 0)
@@ -42,6 +49,8 @@ namespace VRProject.Presentation.PrototypeFps
 
         void OnEnable()
         {
+            var locator = ServiceLocator.Instance;
+            _clock = locator.IsRegistered<IGameplayClock>() ? locator.Resolve<IGameplayClock>() : null;
             if (_health != null)
                 _health.Damaged += OnDamaged;
         }
@@ -93,6 +102,8 @@ namespace VRProject.Presentation.PrototypeFps
 
         void Update()
         {
+            ApplyNavMeshSpeedFromGameplayClock();
+
             if (_player == null)
             {
                 var go = GameObject.FindGameObjectWithTag("Player");
@@ -113,7 +124,7 @@ namespace VRProject.Presentation.PrototypeFps
                 _agent.SetDestination(_player.position);
             }
 
-            _nextShot -= Time.deltaTime;
+            _nextShot -= ResolveShotSimulationDeltaTime();
             if (_nextShot > 0f)
                 return;
 
@@ -163,6 +174,27 @@ namespace VRProject.Presentation.PrototypeFps
             var hp = hit.collider.GetComponentInParent<PrototypeFpsPlayerHealth>();
             if (hp != null && hp.IsAlive)
                 hp.ApplyDamage(_burstDamage);
+        }
+
+        void ApplyNavMeshSpeedFromGameplayClock()
+        {
+            if (_agent == null)
+                return;
+            var tf = _clock != null ? Mathf.Clamp01(_clock.LastTimeFactor) : 1f;
+            _agent.speed = _baseAgentSpeed * tf;
+            _agent.angularSpeed = _baseAgentAngularSpeed * tf;
+        }
+
+        float ResolveShotSimulationDeltaTime()
+        {
+            if (_clock == null)
+                return Time.deltaTime;
+            var sim = _clock.SimulationDeltaTime;
+            if (sim > 1e-8f)
+                return sim;
+            if (_clock.LastTimeFactor >= 0.99f)
+                return Time.deltaTime;
+            return 0f;
         }
     }
 }
