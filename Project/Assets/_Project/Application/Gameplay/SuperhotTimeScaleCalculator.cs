@@ -38,6 +38,19 @@ namespace VRProject.Application.Gameplay
             return minTimeFactor + (maxTimeFactor - minTimeFactor) * t;
         }
 
+        /// <summary>
+        /// 시뮬레이션 dt가 0일 때도 키 입력으로 시간 진행을 풀 수 있도록, 속도와 의도(×이동속도) 중 큰 값을 씁니다.
+        /// </summary>
+        public static float EffectivePlanarSpeedForTime(
+            float planarVelocityMetersPerSecond,
+            float moveIntent01,
+            float moveSpeedMetersPerSecond)
+        {
+            var fromIntent = moveIntent01 * moveSpeedMetersPerSecond;
+            return planarVelocityMetersPerSecond >= fromIntent
+                ? planarVelocityMetersPerSecond
+                : fromIntent;
+        }
 
         /// <summary>
         /// Desktop playtest: blend keyboard locomotion vs mouse-look intensity into one motion 0..1.

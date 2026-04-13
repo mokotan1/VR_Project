@@ -55,6 +55,26 @@ namespace VRProject.Tests.EditMode
         }
 
         [Test]
+        public void ToTimeFactor_MinZero_StationaryIsZero()
+        {
+            Assert.AreEqual(0f, SuperhotTimeScaleCalculator.ToTimeFactor(0f, 0f, 1f), 1e-5f);
+            Assert.AreEqual(1f, SuperhotTimeScaleCalculator.ToTimeFactor(1f, 0f, 1f), 1e-5f);
+        }
+
+        [Test]
+        public void EffectivePlanarSpeedForTime_UsesMaxOfVelocityAndIntent()
+        {
+            var a = SuperhotTimeScaleCalculator.EffectivePlanarSpeedForTime(2f, 0f, 5f);
+            Assert.AreEqual(2f, a, 1e-5f);
+
+            var b = SuperhotTimeScaleCalculator.EffectivePlanarSpeedForTime(0f, 1f, 5f);
+            Assert.AreEqual(5f, b, 1e-5f);
+
+            var c = SuperhotTimeScaleCalculator.EffectivePlanarSpeedForTime(3f, 0.5f, 5f);
+            Assert.AreEqual(3f, c, 1e-5f);
+        }
+
+        [Test]
         public void SmoothTowards_Converges()
         {
             var v = 0f;

@@ -27,6 +27,11 @@ namespace VRProject.Presentation.Gameplay
 
         public float LastLookIntensityPerSecond { get; private set; }
 
+        /// <summary>Horizontal/Vertical 축 기준 평면 이동 의도 0~1. 시뮬레이션 dt와 무관하게 갱신됩니다.</summary>
+        public float LastPlanarMoveIntent01 { get; private set; }
+
+        public float MoveSpeed => _moveSpeed;
+
         void Awake()
         {
             if (_characterController == null)
@@ -63,9 +68,9 @@ namespace VRProject.Presentation.Gameplay
                 Cursor.visible = Cursor.lockState != CursorLockMode.Locked;
             }
 
+            RefreshPlanarIntentAndSpeed();
+
             var dt = _clock != null ? _clock.SimulationDeltaTime : Time.deltaTime;
-            if (dt <= 0f)
-                return;
 
             var mx = 0f;
             var my = 0f;
@@ -77,6 +82,12 @@ namespace VRProject.Presentation.Gameplay
                 _pitch -= my;
                 _pitch = Mathf.Clamp(_pitch, -89f, 89f);
                 _cameraTransform.localRotation = Quaternion.Euler(_pitch, 0f, 0f);
+            }
+
+            if (dt <= 0f)
+            {
+                LastLookIntensityPerSecond = 0f;
+                return;
             }
 
             if (_characterController == null)
@@ -100,6 +111,22 @@ namespace VRProject.Presentation.Gameplay
                     : 0f;
 
             TryInteractExitPortal();
+        }
+
+        void RefreshPlanarIntentAndSpeed()
+        {
+            var ax = Input.GetAxis("Horizontal");
+            var az = Input.GetAxis("Vertical");
+            var m = new Vector3(ax, 0f, az).magnitude;
+            LastPlanarMoveIntent01 = m > 1f ? 1f : m;
+
+            if (_characterController != null)
+            {
+                var v = _characterController.velocity;
+                LastPlanarSpeedMetersPerSecond = new Vector3(v.x, 0f, v.z).magnitude;
+            }
+            else
+                LastPlanarSpeedMetersPerSecond = 0f;
         }
 
         void TryInteractExitPortal()
