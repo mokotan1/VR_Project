@@ -168,5 +168,25 @@ namespace VRProject.Tests.EditMode
             var t = SuperhotTimeScaleCalculator.DesktopAdditiveTargetTimeScale(0.05f, 1f, 1f, 1f, 1f, 0.25f);
             Assert.AreEqual(1f, t, 1e-4f);
         }
+
+        [Test]
+        public void DesktopMaxBlended_MatchesAdditive_ForNonNegativeWeights()
+        {
+            const float min = 0.05f;
+            const float max = 1f;
+            var moves = new[] { 0f, 0.4f, 1f };
+            var looks = new[] { 0f, 0.6f, 1f };
+            var moveWs = new[] { 0.5f, 1f };
+            var lookWs = new[] { 0.12f, 0.25f };
+            foreach (var m in moves)
+            foreach (var l in looks)
+            foreach (var mw in moveWs)
+            foreach (var lw in lookWs)
+            {
+                var add = SuperhotTimeScaleCalculator.DesktopAdditiveTargetTimeScale(min, max, m, l, mw, lw);
+                var maxB = SuperhotTimeScaleCalculator.DesktopMaxBlendedTargetTimeScale(min, max, m, l, mw, lw);
+                Assert.AreEqual(add, maxB, 1e-4f, $"m={m} l={l} mw={mw} lw={lw}");
+            }
+        }
     }
 }

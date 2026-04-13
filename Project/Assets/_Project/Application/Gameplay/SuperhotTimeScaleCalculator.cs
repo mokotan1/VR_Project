@@ -150,6 +150,24 @@ namespace VRProject.Application.Gameplay
         }
 
         /// <summary>
+        /// 이동만·시선만·가산 합 중 목표 배율이 가장 큰 값을 씁니다(WASD가 마우스 약한 입력에 덮이지 않게).
+        /// </summary>
+        public static float DesktopMaxBlendedTargetTimeScale(
+            float minFactor,
+            float maxFactor,
+            float move01,
+            float look01,
+            float moveWeight,
+            float lookWeight)
+        {
+            var moveOnly = DesktopAdditiveTargetTimeScale(minFactor, maxFactor, move01, 0f, moveWeight, lookWeight);
+            var lookOnly = DesktopAdditiveTargetTimeScale(minFactor, maxFactor, 0f, look01, moveWeight, lookWeight);
+            var additive = DesktopAdditiveTargetTimeScale(minFactor, maxFactor, move01, look01, moveWeight, lookWeight);
+            var m = Math.Max(moveOnly, lookOnly);
+            return Math.Max(m, additive);
+        }
+
+        /// <summary>
         /// 시뮬레이션 dt가 0일 때도 키 입력으로 시간 진행을 풀 수 있도록, 속도와 의도(×이동속도) 중 큰 값을 씁니다.
         /// </summary>
         public static float EffectivePlanarSpeedForTime(

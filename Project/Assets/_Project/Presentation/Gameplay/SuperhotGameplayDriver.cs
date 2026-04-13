@@ -16,12 +16,11 @@ namespace VRProject.Presentation.Gameplay
 
     /// <summary>
     /// Samples motion (XR: HMD + hands 위치·회전; flat: WASD 평면 이동 — 옵션으로 마우스 시점 포함) 후
-    /// Unity 시간 배율·고정 스텝·<see cref="IGameplayClock"/>을 갱신합니다.
-    /// <see cref="_applyUnityTimeScale"/>를 켜 두면 Animator·ParticleSystem·NavMesh 등
-    /// <c>Time.deltaTime</c> 기반 내장 동작이 시간 배율과 한꺼번에 맞춰집니다.
-    /// 애니만 별도 속도가 필요하면 해당 Animator의 <c>speed</c>를 추가로 튜닝합니다.
+    /// <c>Time.timeScale</c>·고정 스텝·<see cref="IGameplayClock"/>을 갱신합니다(전역 시간 배율 항상 적용).
+    /// Animator·ParticleSystem·NavMesh 등 <c>Time.deltaTime</c> 기반 동작이 같은 시계를 씁니다.
+    /// 실행 순서: <see cref="SuperhotFlatFpsController"/> / <see cref="OsFpsInspiredPlayerMotor"/>가 먼저 갱신되도록 이 스크립트의 order가 더 큽니다.
     /// </summary>
-    [DefaultExecutionOrder(-80)]
+    [DefaultExecutionOrder(-20)]
     [DisallowMultipleComponent]
     public sealed class SuperhotGameplayDriver : MonoBehaviour
     {
@@ -121,23 +120,20 @@ namespace VRProject.Presentation.Gameplay
         [Range(0f, 1f)]
         [SerializeField] float _flatLookWeight = 0.45f;
 
-        [Tooltip("끄면(권장) WASD 발 이동만 시간에 반영합니다. 켜면 마우스로 화면만 돌려도 시간이 조금 진행됩니다.")]
-        [SerializeField] bool _flatTimeIncludesMouseLook = false;
-
-        [Tooltip("플랫 플레이에서도 Time.timeScale / fixedDeltaTime을 VR과 동일하게 적용합니다.")]
-        [SerializeField] bool _applyUnityTimeScale = true;
+        [Tooltip("레거시 플랫 모드에서 마우스 시점을 시간 합성(FlatBlendedMotion01)에 넣습니다. 데스크톱 가산 모드는 항상 look을 씁니다.")]
+        [SerializeField] bool _flatTimeIncludesMouseLook = true;
 
         [Tooltip("플랫 모드에서 이동 소스(SuperhotFlatFps / OsFpsMotor)를 찾지 못할 때 시간을 1로 둡니다. 끄면 _minTimeFactor(거의 정지)로 둡니다.")]
         [SerializeField] bool _flatUseFullTimeWhenNoMotor;
 
-        [Tooltip("PC/패드: 입력·상태 기반 가산 목표 배율(스펙). 끄면 기존 속도 기반 플랫 모델을 씁니다.")]
-        [SerializeField] bool _flatUseDesktopInputModel;
+        [Tooltip("PC/패드: 입력·상태 기반 가산 목표 배율(WASD·마우스 look 분리). 끄면 속도 기반 플랫 모델.")]
+        [SerializeField] bool _flatUseDesktopInputModel = true;
 
-        [Tooltip("데스크톱 가산식: 이동 의도(0~1)에 곱하는 가중치.")]
+        [Tooltip("데스크톱 목표 배율: 가산식에서 move01×이 값이 시간 상승에 기여합니다. 1 미만이면 풀 WASD만으로도 합이 1에 못 닿아 _maxTimeFactor에 도달하지 못할 수 있으니, 먼저 1로 두고 look 가중치만 줄이는 것을 권장합니다.")]
         [SerializeField] float _flatDesktopMoveWeight = 1f;
 
-        [Tooltip("데스크톱 가산식: 마우스 시선(0~1)에 곱하는 가중치.")]
-        [SerializeField] float _flatDesktopLookWeight = 0.25f;
+        [Tooltip("데스크톱 목표 배율: look01×이 값이 가산됩니다. 이동 가중치와 합쳐 최종 목표는 move·look 채널(단독)과 가산값 중 최대(DesktopMaxBlended)로 잡힙니다.")]
+        [SerializeField] float _flatDesktopLookWeight = 0.12f;
 
         [Tooltip("데스크톱: 공중일 때 목표 배율이 이보다 내려가지 않게 합니다.")]
         [Range(0.01f, 1f)]
@@ -146,14 +142,14 @@ namespace VRProject.Presentation.Gameplay
         [Tooltip("비어 있으면 씬에서 찾습니다.")]
         [SerializeField] SuperhotFlatHitscanWeapon _flatHitscanWeapon;
 
-        [Header("완전 정지 (움직임 없을 때 화면·시간 동결)")]
-        [Tooltip("켜면 motion이 0일 때 Time.timeScale 목표를 _minTimeFactor 대신 0으로 둡니다. 애니·피직스·Time.deltaTime 기반 업데이트가 멈춥니다(드라이버는 unscaled로만 감지).")]
-        [SerializeField] bool _completeFreezeWhenIdle = true;
-
         [Header("시간 느리게/빠르게 (기획에서 자주 조정)")]
-        [Tooltip("가만히 있을 때 시간 배율(Complete Freeze 끌 때만 사용). 완전 동결이면 motion=0일 때 0이 목표가 됩니다.")]
-        [Range(0.001f, 1f)]
+        [Tooltip("입력이 거의 없을 때 목표 시간 배율(원작처럼 완전 0은 금지 — 아래 절대 하한 이상).")]
+        [Range(0.01f, 1f)]
         [SerializeField] float _minTimeFactor = 0.05f;
+
+        [Tooltip("Time.timeScale·시계에 쓰는 값의 절대 하한(0.01~0.05 권장). 완전 정지 방지.")]
+        [Range(0.001f, 0.2f)]
+        [SerializeField] float _absoluteMinTimeScale = 0.01f;
 
         [Tooltip("많이 움직일 때 최대 시간 배율. 보통 1(정상 속도)로 둡니다.")]
         [Range(0.1f, 1f)]
@@ -176,7 +172,7 @@ namespace VRProject.Presentation.Gameplay
         [SerializeField] float _baseFixedDeltaTime = 0.02f;
 
         [Header("진단 · 스무딩 보정 (선택)")]
-        [Tooltip("켜면 콘솔에 timeScale / 시계 / Unity 이론 delta 비교를 출력합니다(에디터·Development 빌드).")]
+        [Tooltip("켜면 콘솔에 목표(targetMotion)·스무딩(smoothed)·timeScale 등을 출력합니다. WASD 시 targetMotion이 1에 가까운지, smoothed가 따라오는지 확인할 때 사용합니다.")]
         [SerializeField] bool _debugLogTimeScale;
 
         [Tooltip("디버그 로그 최소 간격(실시간 초). 0이면 매 프레임.")]
@@ -439,8 +435,8 @@ namespace VRProject.Presentation.Gameplay
                 _flatLookDeadZone,
                 _flatLookReference);
 
-            var baseTarget = SuperhotTimeScaleCalculator.DesktopAdditiveTargetTimeScale(
-                _minTimeFactor,
+            var baseTarget = SuperhotTimeScaleCalculator.DesktopMaxBlendedTargetTimeScale(
+                IdleTargetMinFactor,
                 _maxTimeFactor,
                 move01,
                 look01,
@@ -461,8 +457,8 @@ namespace VRProject.Presentation.Gameplay
             var move01 = _osFpsMotor.LastPlanarMoveIntent01;
             const float look01 = 0f;
 
-            var baseTarget = SuperhotTimeScaleCalculator.DesktopAdditiveTargetTimeScale(
-                _minTimeFactor,
+            var baseTarget = SuperhotTimeScaleCalculator.DesktopMaxBlendedTargetTimeScale(
+                IdleTargetMinFactor,
                 _maxTimeFactor,
                 move01,
                 look01,
@@ -478,13 +474,12 @@ namespace VRProject.Presentation.Gameplay
             FinishFrameWithSmoothedTarget(unscaledDt, targetFactor);
         }
 
-        /// <summary>motion 0일 때 완전 동결(최소 0) vs 슬로만(_minTimeFactor) 선택.</summary>
-        float EffectiveMinTimeFactor(float blendedMotion01)
+        float EffectiveMinTimeFactor(float _)
         {
-            if (_completeFreezeWhenIdle && blendedMotion01 <= 1e-5f)
-                return 0f;
-            return _minTimeFactor;
+            return Mathf.Max(_absoluteMinTimeScale, _minTimeFactor);
         }
+
+        float IdleTargetMinFactor => Mathf.Max(_absoluteMinTimeScale, _minTimeFactor);
 
         float ApplyAngularDeadZone(float degreesPerSecond)
         {
@@ -510,7 +505,7 @@ namespace VRProject.Presentation.Gameplay
         /// <summary>목표 배율까지 스무딩한 뒤 Unity 시간과 게임 시계에 반영합니다.</summary>
         void FinishFrameWithSmoothedTarget(float unscaledDt, float targetFactor)
         {
-            var snapThreshold = _completeFreezeWhenIdle ? _snapToMinEpsilon : _minTimeFactor + _snapToMinEpsilon;
+            var snapThreshold = Mathf.Max(_absoluteMinTimeScale, _minTimeFactor) + _snapToMinEpsilon;
             if (_snapSmoothedWhenTargetAtMin && targetFactor <= snapThreshold)
             {
                 _smoothedTimeFactor = targetFactor;
@@ -546,21 +541,15 @@ namespace VRProject.Presentation.Gameplay
 
         void ApplySmoothedTimeToUnityAndClock(float unscaledDt, float targetFactorForDebug)
         {
-            var factor = _smoothedTimeFactor;
-            if (_applyUnityTimeScale)
-            {
-                Time.timeScale = factor;
-                // timeScale==0이면 물리 스텝도 0에 가깝게(완전 정지). 일부 플랫폼은 0 고정스텝에 민감해 최소값을 사용할 수 있음.
-                var scaledFixed = _baseFixedDeltaTime * Time.timeScale;
-                Time.fixedDeltaTime = scaledFixed > 1e-8f ? scaledFixed : 0f;
-            }
+            var factor = Mathf.Clamp(_smoothedTimeFactor, _absoluteMinTimeScale, _maxTimeFactor);
+            Time.timeScale = factor;
+            var scaledFixed = _baseFixedDeltaTime * Time.timeScale;
+            Time.fixedDeltaTime = scaledFixed > 1e-8f ? scaledFixed : _baseFixedDeltaTime * _absoluteMinTimeScale;
 
-            // 시계: unscaledDeltaTime × timeFactor — Unity 문서상 Time.deltaTime과 같은 프레임에서의 이론값과 일치시키기 위함
-            var clockFactor = _applyUnityTimeScale ? Time.timeScale : factor;
-            _clock.BeginFrame(unscaledDt, clockFactor);
+            _clock.BeginFrame(unscaledDt, factor);
 
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
-            LogTimeScaleDiagnosticsIfNeeded(unscaledDt, targetFactorForDebug, factor, clockFactor);
+            LogTimeScaleDiagnosticsIfNeeded(unscaledDt, targetFactorForDebug, factor, factor);
 #endif
         }
 
@@ -598,8 +587,7 @@ namespace VRProject.Presentation.Gameplay
                 " theory(unscaled×factor)=" + theoryFromUnscaled.ToString("F5") +
                 " |Δ(theory)|=" + mismatchVsTheory.ToString("F6") +
                 " Time.deltaTime=" + unityDt.ToString("F5") +
-                " |Δ(Unity.dt)|=" + mismatchVsUnityDt.ToString("F6") +
-                " applyUnityTS=" + _applyUnityTimeScale,
+                " |Δ(Unity.dt)|=" + mismatchVsUnityDt.ToString("F6"),
                 this);
         }
 #endif
@@ -647,8 +635,8 @@ namespace VRProject.Presentation.Gameplay
             _flatLookDeadZone = Mathf.Max(0f, _flatLookDeadZone);
             _flatPlanarWeight = Mathf.Max(0f, _flatPlanarWeight);
             _flatLookWeight = Mathf.Max(0f, _flatLookWeight);
-            _minTimeFactor = Mathf.Max(1e-3f, _minTimeFactor);
-            _minTimeFactor = Mathf.Clamp(_minTimeFactor, 1e-3f, 1f);
+            _absoluteMinTimeScale = Mathf.Clamp(_absoluteMinTimeScale, 0.001f, 0.2f);
+            _minTimeFactor = Mathf.Clamp(_minTimeFactor, _absoluteMinTimeScale, 1f);
             _maxTimeFactor = Mathf.Clamp(_maxTimeFactor, _minTimeFactor, 1f);
             _rssReferenceSpeed = Mathf.Max(0.01f, _rssReferenceSpeed);
             _rssDeadZoneSpeed = Mathf.Max(0f, _rssDeadZoneSpeed);
