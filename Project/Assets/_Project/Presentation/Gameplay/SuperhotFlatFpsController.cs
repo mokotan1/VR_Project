@@ -7,6 +7,7 @@ namespace VRProject.Presentation.Gameplay
     /// <summary>
     /// Desktop playtest locomotion: WASD, mouse look, Esc to unlock cursor, E to activate exit portal in view.
     /// <see cref="SuperhotGameplayDriver"/>보다 나중에 실행되어 같은 프레임에서 갱신된 시계를 읽습니다(-80 먼음, 이 스크립트 -50).
+    /// 이동·중력은 <see cref="IGameplayClock.SimulationDeltaTime"/>만 사용합니다(sim≈0이면 멈춤, unscaled 폴백 없음). 완전 정지에서 슬로모를 풀려면 UI 등 별도 경로가 필요할 수 있습니다.
     /// </summary>
     [DefaultExecutionOrder(-50)]
     [RequireComponent(typeof(CharacterController))]
@@ -20,15 +21,16 @@ namespace VRProject.Presentation.Gameplay
         [SerializeField] float _gravity = -18f;
         [SerializeField] float _interactMaxDistance = 4f;
 
-        [Tooltip("SimulationDeltaTime이 거의 0일 때 unscaledDeltaTime으로 이동해 시간을 다시 풀 수 있게 합니다. 끄면 시간이 멈출 때 플레이어도 멈춥니다(적·시계와 정합).")]
-        [SerializeField] bool _allowUnscaledMoveWhenSimStopped = true;
+        [Tooltip("끄면(권장·원작 느낌) 시점은 실시간 입력 그대로; 시간 배율은 드라이버가 LastLookIntensity로만 반영합니다.")]
+        [SerializeField] bool _scaleMouseLookByTimeFactor;
 
-        [Tooltip("켜면 마우스 시점 입력에 LastTimeFactor를 곱해 슬로모에서 회전을 몸 이동에 맞춥니다.")]
-        [SerializeField] bool _scaleMouseLookByTimeFactor = true;
-
-        [Tooltip("시간 배율이 낮아도 시점이 너무 둔해지지 않게 하는 최소 배율(×).")]
+        [Tooltip("시간 배율이 낮을 때도 시점이 완전히 굳지 않게 하는 하한(× LastTimeFactor).")]
         [Range(0.02f, 1f)]
         [SerializeField] float _mouseLookTimeFactorMin = 0.12f;
+
+        [Tooltip("시점 배율 상한(보통 1). LastTimeFactor를 이 값으로 Clamp.")]
+        [Range(0.1f, 2f)]
+        [SerializeField] float _mouseLookTimeFactorMax = 1f;
 
         float _pitch;
         Vector3 _velocity;
@@ -88,25 +90,20 @@ namespace VRProject.Presentation.Gameplay
             RefreshPlanarIntentAndSpeed();
 
             var simDt = _clock != null ? _clock.SimulationDeltaTime : Time.deltaTime;
-            // timeScale=0이면 SimulationDeltaTime이 0 — 폴백 켬: 실시간으로만 살짝 움직여 드라이버가 입력을 받게 함. 끔: 적·시계와 동일하게 정지.
-            float dt;
-            if (simDt > 1e-9f)
-                dt = simDt;
-            else if (_allowUnscaledMoveWhenSimStopped)
-                dt = Time.unscaledDeltaTime;
-            else
-                dt = 0f;
+            var dt = simDt > 1e-9f ? simDt : 0f;
 
             var lookScale = 1f;
             if (_scaleMouseLookByTimeFactor && _clock != null)
-                lookScale = Mathf.Max(_mouseLookTimeFactorMin, _clock.LastTimeFactor);
+                lookScale = Mathf.Clamp(_clock.LastTimeFactor, _mouseLookTimeFactorMin, _mouseLookTimeFactorMax);
 
             var mx = 0f;
             var my = 0f;
             if (Cursor.lockState == CursorLockMode.Locked && _cameraTransform != null)
             {
-                mx = Input.GetAxis("Mouse X") * _mouseSensitivity * lookScale;
-                my = Input.GetAxis("Mouse Y") * _mouseSensitivity * lookScale;
+                var rawMx = Input.GetAxis("Mouse X") * _mouseSensitivity;
+                var rawMy = Input.GetAxis("Mouse Y") * _mouseSensitivity;
+                mx = rawMx * lookScale;
+                my = rawMy * lookScale;
                 transform.Rotate(0f, mx, 0f);
                 _pitch -= my;
                 _pitch = Mathf.Clamp(_pitch, -89f, 89f);
@@ -128,11 +125,12 @@ namespace VRProject.Presentation.Gameplay
 
             var vel = _characterController.velocity;
             LastPlanarSpeedMetersPerSecond = new Vector3(vel.x, 0f, vel.z).magnitude;
-            var denomForLook = dt > 1e-9f ? dt : Time.unscaledDeltaTime;
-            LastLookIntensityPerSecond =
-                Cursor.lockState == CursorLockMode.Locked
-                    ? new Vector2(mx, my).magnitude / Mathf.Max(1e-6f, denomForLook)
-                    : 0f;
+            // 드라이버용: 시점 입력 강도는 실시간 초당으로(시점 회전은 위에서 이미 적용됨).
+            var rawForIntensity = Cursor.lockState == CursorLockMode.Locked
+                ? new Vector2(Input.GetAxis("Mouse X") * _mouseSensitivity, Input.GetAxis("Mouse Y") * _mouseSensitivity).magnitude
+                : 0f;
+            var udt = Mathf.Max(1e-6f, Time.unscaledDeltaTime);
+            LastLookIntensityPerSecond = rawForIntensity / udt;
 
             TryInteractExitPortal();
         }
@@ -172,5 +170,13 @@ namespace VRProject.Presentation.Gameplay
             if (portal != null)
                 portal.ActivateExit();
         }
+
+#if UNITY_EDITOR
+        void OnValidate()
+        {
+            if (_mouseLookTimeFactorMin > _mouseLookTimeFactorMax)
+                _mouseLookTimeFactorMin = _mouseLookTimeFactorMax;
+        }
+#endif
     }
 }

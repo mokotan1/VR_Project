@@ -5,6 +5,9 @@ using VRProject.Infrastructure.DI;
 
 namespace VRProject.Presentation.OsFpsInspired
 {
+    /// <summary>
+    /// 이동·중력은 <see cref="IGameplayClock.SimulationDeltaTime"/>만 사용합니다(sim≈0이면 멈춤, SuperhotFlatFpsController와 동일).
+    /// </summary>
     [RequireComponent(typeof(CharacterController))]
     [DefaultExecutionOrder(-50)]
     public sealed class OsFpsInspiredPlayerMotor : MonoBehaviour
@@ -14,6 +17,17 @@ namespace VRProject.Presentation.OsFpsInspired
         [SerializeField] float _mouseSensitivity = 0.12f;
         [SerializeField] float _gravity = -20f;
         [SerializeField] float _jumpHeight = 1.2f;
+
+        [Tooltip("끄면(권장) 시점은 실시간 입력 그대로.")]
+        [SerializeField] bool _scaleMouseLookByTimeFactor;
+
+        [Tooltip("시간 배율이 낮을 때 시점 하한 배율.")]
+        [Range(0.02f, 1f)]
+        [SerializeField] float _mouseLookTimeFactorMin = 0.12f;
+
+        [Tooltip("시점 배율 상한(보통 1).")]
+        [Range(0.1f, 2f)]
+        [SerializeField] float _mouseLookTimeFactorMax = 1f;
 
         float _pitch;
         Vector3 _velocity;
@@ -68,15 +82,20 @@ namespace VRProject.Presentation.OsFpsInspired
 
             if (Cursor.lockState == CursorLockMode.Locked && Mouse.current != null && _cameraTransform != null)
             {
+                var lookScale = 1f;
+                if (_scaleMouseLookByTimeFactor && _clock != null)
+                    lookScale = Mathf.Clamp(_clock.LastTimeFactor, _mouseLookTimeFactorMin, _mouseLookTimeFactorMax);
+
+                var sens = _mouseSensitivity * lookScale;
                 var d = Mouse.current.delta.ReadValue();
-                transform.Rotate(0f, d.x * _mouseSensitivity, 0f);
-                _pitch -= d.y * _mouseSensitivity;
+                transform.Rotate(0f, d.x * sens, 0f);
+                _pitch -= d.y * sens;
                 _pitch = Mathf.Clamp(_pitch, -88f, 88f);
                 _cameraTransform.localRotation = Quaternion.Euler(_pitch, 0f, 0f);
             }
 
             var simDt = _clock != null ? _clock.SimulationDeltaTime : Time.deltaTime;
-            var dt = simDt > 1e-9f ? simDt : Time.unscaledDeltaTime;
+            var dt = simDt > 1e-9f ? simDt : 0f;
 
             var cc = _characterController != null ? _characterController : GetComponent<CharacterController>();
             _characterController = cc;
@@ -123,6 +142,14 @@ namespace VRProject.Presentation.OsFpsInspired
             else
                 LastPlanarSpeedMetersPerSecond = 0f;
         }
+
+#if UNITY_EDITOR
+        void OnValidate()
+        {
+            if (_mouseLookTimeFactorMin > _mouseLookTimeFactorMax)
+                _mouseLookTimeFactorMin = _mouseLookTimeFactorMax;
+        }
+#endif
     }
 }
 
