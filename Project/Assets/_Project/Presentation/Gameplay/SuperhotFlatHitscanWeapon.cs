@@ -48,7 +48,7 @@ namespace VRProject.Presentation.Gameplay
 
             var enemy = hit.collider.GetComponentInParent<SuperhotEnemy>();
             if (enemy != null)
-                enemy.Kill();
+                enemy.Kill(hit);
         }
     }
 }

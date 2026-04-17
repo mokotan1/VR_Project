@@ -17,6 +17,12 @@ namespace VRProject.Presentation.OsFpsInspired
         [Tooltip("총구 위치. 비우면 총 모델 안에서 이름으로 찾거나, 메시 크기로 대략 잡습니다.")]
         [SerializeField] Transform _muzzleTransform;
 
+        [Header("뷰모델 위치 (인스펙터 조정)")]
+        [Tooltip("플레이 시작·장착 시 잡힌 총 로컬 위치에 더해집니다. 카메라 앞 스냅 위치를 코드 없이 맞출 때 사용합니다.")]
+        [SerializeField] Vector3 _handGunLocalPositionOffset;
+        [Tooltip("기준 로컬 회전에 곱해질 오일러(도) 오프셋입니다.")]
+        [SerializeField] Vector3 _handGunLocalEulerOffset;
+
         [Header("시작 상태")]
         [Tooltip("켜면 게임 시작부터 총을 들고 탄창이 가득 찬 상태입니다. 끄면 바닥 픽업 등으로 줍기 전엔 발사할 수 없습니다.")]
         [SerializeField] bool _startEquipped = false;
@@ -105,6 +111,9 @@ namespace VRProject.Presentation.OsFpsInspired
         float _lastFireUnscaledTime = -999f;
         Transform _runtimeMuzzleProxy;
         Transform _hitscanExclusionRoot;
+        Vector3 _handGunBaseLocalPosition;
+        Quaternion _handGunBaseLocalRotation;
+        bool _hasHandGunBasePose;
 
         public int AmmoInMag => _ammoInMag;
         public int MagSize => _magSize;
@@ -125,6 +134,8 @@ namespace VRProject.Presentation.OsFpsInspired
             if (_handGunVisual != null)
                 _handGunVisual.SetActive(_equipped);
             _ammoInMag = _equipped ? _magSize : 0;
+            CaptureHandGunBasePose();
+            ApplyHandGunViewmodelOffset();
         }
 
         public void SetEquipped(bool equipped)
@@ -153,6 +164,51 @@ namespace VRProject.Presentation.OsFpsInspired
                 _ammoInMag = 0;
                 _reloadEnds = 0f;
             }
+        }
+
+        /// <summary>뷰모델 기준 로컬 포즈에 인스펙터 오프셋을 합성합니다(단위 테스트용).</summary>
+        public static void ApplyViewmodelLocalOffsets(
+            Vector3 baseLocalPosition,
+            Quaternion baseLocalRotation,
+            Vector3 positionOffset,
+            Vector3 eulerOffsetDegrees,
+            out Vector3 outLocalPosition,
+            out Quaternion outLocalRotation)
+        {
+            outLocalPosition = baseLocalPosition + positionOffset;
+            outLocalRotation = baseLocalRotation * Quaternion.Euler(eulerOffsetDegrees);
+        }
+
+        void CaptureHandGunBasePose()
+        {
+            _hasHandGunBasePose = false;
+            if (_handGunVisual == null)
+                return;
+            var t = _handGunVisual.transform;
+            _handGunBaseLocalPosition = t.localPosition;
+            _handGunBaseLocalRotation = t.localRotation;
+            _hasHandGunBasePose = true;
+        }
+
+        void ApplyHandGunViewmodelOffset()
+        {
+            if (!_equipped || !_hasHandGunBasePose || _handGunVisual == null)
+                return;
+            ApplyViewmodelLocalOffsets(
+                _handGunBaseLocalPosition,
+                _handGunBaseLocalRotation,
+                _handGunLocalPositionOffset,
+                _handGunLocalEulerOffset,
+                out var p,
+                out var r);
+            var t = _handGunVisual.transform;
+            t.localPosition = p;
+            t.localRotation = r;
+        }
+
+        void LateUpdate()
+        {
+            ApplyHandGunViewmodelOffset();
         }
 
         Transform ResolveMuzzleTransform()

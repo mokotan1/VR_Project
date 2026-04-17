@@ -6,7 +6,8 @@ namespace VRProject.Presentation.Gameplay
 {
     /// <summary>
     /// Desktop playtest locomotion: WASD, mouse look, Esc to unlock cursor, E to activate exit portal in view.
-    /// <see cref="SuperhotGameplayDriver"/>보다 나중에 실행되어 같은 프레임에서 갱신된 시계를 읽습니다(-80 먼음, 이 스크립트 -50).
+    /// 실행 순서: 이 스크립트(-50) → <see cref="SuperhotGameplayDriver"/>(-20) 순으로 실행됩니다.
+    /// 따라서 이동에 쓰이는 <see cref="IGameplayClock.SimulationDeltaTime"/>은 전 프레임에 드라이버가 기록한 값입니다(1프레임 지연, 약 16ms — 의도된 한계).
     /// 이동·중력은 <see cref="IGameplayClock.SimulationDeltaTime"/>만 사용합니다(sim≈0이면 멈춤, unscaled 폴백 없음). 완전 정지에서 슬로모를 풀려면 UI 등 별도 경로가 필요할 수 있습니다.
     /// </summary>
     [DefaultExecutionOrder(-50)]
@@ -137,18 +138,10 @@ namespace VRProject.Presentation.Gameplay
 
         void RefreshPlanarIntentAndSpeed()
         {
-            var ax = Input.GetAxis("Horizontal");
-            var az = Input.GetAxis("Vertical");
+            var ax = Input.GetAxisRaw("Horizontal");
+            var az = Input.GetAxisRaw("Vertical");
             var m = new Vector3(ax, 0f, az).magnitude;
             LastPlanarMoveIntent01 = m > 1f ? 1f : m;
-
-            if (_characterController != null)
-            {
-                var v = _characterController.velocity;
-                LastPlanarSpeedMetersPerSecond = new Vector3(v.x, 0f, v.z).magnitude;
-            }
-            else
-                LastPlanarSpeedMetersPerSecond = 0f;
         }
 
         void TryInteractExitPortal()

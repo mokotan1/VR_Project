@@ -22,6 +22,7 @@ namespace VRProject.EditorTools
         const string ScenePath = "Assets/Scenes/SuperhotPrototype.unity";
         const string PlayerInteractionTestScenePath = "Assets/Scenes/PlayerInteractionTest.unity";
         const string ProjectilePrefabPath = "Assets/_Project/Presentation/Gameplay/Prefabs/SuperhotProjectile.prefab";
+        const string GlassShardBurstPrefabPath = "Assets/GlassShards/Prefabs/GlassShardBurst.prefab";
         const string XriPackageJsonPath = "Packages/com.unity.xr.interaction.toolkit/package.json";
 
         static readonly Vector3 XrRigSpawnPosition = new Vector3(0f, 0f, -2f);
@@ -451,6 +452,14 @@ namespace VRProject.EditorTools
                 cap.AddComponent<SuperhotEnemy>();
                 cap.AddComponent<SuperhotEnemyMover>();
                 cap.AddComponent<SuperhotEnemyShooter>();
+                var shardBurst = AssetDatabase.LoadAssetAtPath<GameObject>(GlassShardBurstPrefabPath);
+                if (shardBurst != null)
+                {
+                    var enemySo = new SerializedObject(cap.GetComponent<SuperhotEnemy>());
+                    enemySo.FindProperty("_glassShardBurstPrefab").objectReferenceValue = shardBurst;
+                    enemySo.ApplyModifiedPropertiesWithoutUndo();
+                }
+
                 var mat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
                 mat.color = new Color(0.85f, 0.15f, 0.12f);
                 cap.GetComponent<MeshRenderer>().sharedMaterial = mat;

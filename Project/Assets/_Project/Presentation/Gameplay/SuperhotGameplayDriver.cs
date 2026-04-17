@@ -181,6 +181,12 @@ namespace VRProject.Presentation.Gameplay
         [Tooltip("목표 배율이 최소(_minTimeFactor)에 붙으면 스무딩을 건너뛰고 즉시 최소로 맞춥니다(정지 직후 슬로모 잔상 완화).")]
         [SerializeField] bool _snapSmoothedWhenTargetAtMin = true;
 
+        [Tooltip("목표 배율이 최대(_maxTimeFactor)에 붙으면 스무딩을 건너뛰고 즉시 최대로 맞춥니다(이동 시작 시 즉각 반응).")]
+        [SerializeField] bool _snapSmoothedWhenTargetAtMax = false;
+
+        [Tooltip("목표가 최대로 간주되는 여유(이상이면 스냅).")]
+        [SerializeField] float _snapToMaxEpsilon = 0.002f;
+
         [Tooltip("목표가 최소로 간주되는 여유(이하면 스냅).")]
         [SerializeField] float _snapToMinEpsilon = 0.002f;
 
@@ -196,6 +202,21 @@ namespace VRProject.Presentation.Gameplay
         float _smoothVelocity;
         float _debugLogAccumulatorUnscaled;
         SuperhotFlatFpsController _flatFps;
+
+        // 개발자 HUD용 실시간 값
+        float _dbgTarget;
+        float _dbgMove01;
+        float _dbgLook01;
+
+        public float DbgSmoothed         => _smoothedTimeFactor;
+        public float DbgTarget           => _dbgTarget;
+        public float DbgMove01           => _dbgMove01;
+        public float DbgLook01           => _dbgLook01;
+        public float DbgHeadWeight       => _headWeight;
+        public float DbgHandWeight       => _handWeight;
+        public float DbgMoveWeight       => _flatDesktopMoveWeight;
+        public float DbgLookWeight       => _flatDesktopLookWeight;
+        public float DbgMaxDeltaPerSecond => _maxTimeScaleChangePerSecond;
         OsFpsInspiredPlayerMotor _osFpsMotor;
 
         void Awake()
@@ -353,10 +374,8 @@ namespace VRProject.Presentation.Gameplay
 
                 if (_osFpsMotor == null)
                 {
-                    if (_flatUseFullTimeWhenNoMotor)
-                        ApplyMaxTimeAndClock(unscaledDt);
-                    else
-                        FinishFrameWithSmoothedTarget(unscaledDt, _minTimeFactor);
+                    // 씬에 알려진 모터 컴포넌트가 없음(UnityChan 등) → raw input으로 직접 구동
+                    DriveFlatDesktopRawInput(unscaledDt);
                     return;
                 }
 
@@ -400,10 +419,7 @@ namespace VRProject.Presentation.Gameplay
 
                 if (_osFpsMotor == null)
                 {
-                    if (_flatUseFullTimeWhenNoMotor)
-                        ApplyMaxTimeAndClock(unscaledDt);
-                    else
-                        FinishFrameWithSmoothedTarget(unscaledDt, EffectiveMinTimeFactor(0f));
+                    DriveFlatDesktopRawInput(unscaledDt);
                     return;
                 }
 
@@ -435,6 +451,9 @@ namespace VRProject.Presentation.Gameplay
                 _flatLookDeadZone,
                 _flatLookReference);
 
+            _dbgMove01 = move01;
+            _dbgLook01 = look01;
+
             var baseTarget = SuperhotTimeScaleCalculator.DesktopMaxBlendedTargetTimeScale(
                 IdleTargetMinFactor,
                 _maxTimeFactor,
@@ -455,7 +474,13 @@ namespace VRProject.Presentation.Gameplay
         void DriveFlatDesktopAdditiveFromOsMotor(float unscaledDt)
         {
             var move01 = _osFpsMotor.LastPlanarMoveIntent01;
-            const float look01 = 0f;
+            var look01 = SuperhotTimeScaleCalculator.Motion01FromSpeed(
+                SampleFlatLookIntensity(),
+                _flatLookDeadZone,
+                _flatLookReference);
+
+            _dbgMove01 = move01;
+            _dbgLook01 = look01;
 
             var baseTarget = SuperhotTimeScaleCalculator.DesktopMaxBlendedTargetTimeScale(
                 IdleTargetMinFactor,
@@ -474,12 +499,51 @@ namespace VRProject.Presentation.Gameplay
             FinishFrameWithSmoothedTarget(unscaledDt, targetFactor);
         }
 
+        void DriveFlatDesktopRawInput(float unscaledDt)
+        {
+            var ax = Input.GetAxisRaw("Horizontal");
+            var az = Input.GetAxisRaw("Vertical");
+            var m = new Vector2(ax, az).magnitude;
+            var move01 = m > 1f ? 1f : m;
+            var look01 = SuperhotTimeScaleCalculator.Motion01FromSpeed(
+                SampleFlatLookIntensity(),
+                _flatLookDeadZone,
+                _flatLookReference);
+
+            _dbgMove01 = move01;
+            _dbgLook01 = look01;
+
+            var baseTarget = SuperhotTimeScaleCalculator.DesktopMaxBlendedTargetTimeScale(
+                IdleTargetMinFactor,
+                _maxTimeFactor,
+                move01,
+                look01,
+                _flatDesktopMoveWeight,
+                _flatDesktopLookWeight);
+
+            var targetFactor = baseTarget;
+            if (_flatHitscanWeapon != null && _flatHitscanWeapon.IsInShootTimeScaleHold)
+                targetFactor = _maxTimeFactor;
+
+            FinishFrameWithSmoothedTarget(unscaledDt, targetFactor);
+        }
+
         float EffectiveMinTimeFactor(float _)
         {
             return Mathf.Max(_absoluteMinTimeScale, _minTimeFactor);
         }
 
         float IdleTargetMinFactor => Mathf.Max(_absoluteMinTimeScale, _minTimeFactor);
+
+        float SampleFlatLookIntensity()
+        {
+            if (Cursor.lockState != CursorLockMode.Locked)
+                return 0f;
+            var udt = Mathf.Max(1e-6f, Time.unscaledDeltaTime);
+            return new Vector2(
+                Input.GetAxis("Mouse X"),
+                Input.GetAxis("Mouse Y")).magnitude / udt;
+        }
 
         float ApplyAngularDeadZone(float degreesPerSecond)
         {
@@ -505,10 +569,17 @@ namespace VRProject.Presentation.Gameplay
         /// <summary>목표 배율까지 스무딩한 뒤 Unity 시간과 게임 시계에 반영합니다.</summary>
         void FinishFrameWithSmoothedTarget(float unscaledDt, float targetFactor)
         {
+            _dbgTarget = targetFactor;
+
             var snapThreshold = Mathf.Max(_absoluteMinTimeScale, _minTimeFactor) + _snapToMinEpsilon;
             if (_snapSmoothedWhenTargetAtMin && targetFactor <= snapThreshold)
             {
                 _smoothedTimeFactor = targetFactor;
+                _smoothVelocity = 0f;
+            }
+            else if (_snapSmoothedWhenTargetAtMax && targetFactor >= _maxTimeFactor - _snapToMaxEpsilon)
+            {
+                _smoothedTimeFactor = _maxTimeFactor;
                 _smoothVelocity = 0f;
             }
             else if (_timeSmoothingMode == SuperhotTimeSmoothingMode.MoveTowards)
@@ -644,6 +715,7 @@ namespace VRProject.Presentation.Gameplay
             _baseFixedDeltaTime = Mathf.Max(1e-5f, _baseFixedDeltaTime);
             _debugLogIntervalSeconds = Mathf.Max(0f, _debugLogIntervalSeconds);
             _snapToMinEpsilon = Mathf.Max(0f, _snapToMinEpsilon);
+            _snapToMaxEpsilon = Mathf.Max(0f, _snapToMaxEpsilon);
             _angularDeadZoneDegreesPerSecond = Mathf.Max(0f, _angularDeadZoneDegreesPerSecond);
             _linearNoiseFloorMps = Mathf.Max(0f, _linearNoiseFloorMps);
             _idleBlend01Clamp = Mathf.Max(0f, _idleBlend01Clamp);
