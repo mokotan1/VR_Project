@@ -35,11 +35,13 @@ namespace VRProject.Presentation.Gameplay
 
         void Update()
         {
+            // ComputeSpeed must run every frame to keep _lastHmdPos current
+            var speed = ComputeSpeed();
+
             _emitTimer -= Time.unscaledDeltaTime;
             if (_emitTimer > 0f)
                 return;
 
-            var speed = ComputeSpeed();
             if (speed < _moveSpeedThreshold)
                 return;
 
@@ -51,6 +53,17 @@ namespace VRProject.Presentation.Gameplay
         {
             if (_flatController != null)
                 return _flatController.LastPlanarSpeedMetersPerSecond;
+
+            // Lazy re-lookup in case XR initialized after OnEnable
+            if (_hmd == null && XRSettings.isDeviceActive)
+            {
+                var origin = FindAnyObjectByType<Unity.XR.CoreUtils.XROrigin>();
+                if (origin != null && origin.Camera != null)
+                {
+                    _hmd = origin.Camera.transform;
+                    _lastHmdPos = _hmd.position;
+                }
+            }
 
             if (_hmd != null)
             {

@@ -19,6 +19,9 @@ namespace VRProject.Presentation.Gameplay
     {
         public static event Action<SuperhotSoundEvent> OnSoundEmitted;
 
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        static void ResetOnDomainReload() => OnSoundEmitted = null;
+
         public static void Emit(SuperhotSoundEvent e) => OnSoundEmitted?.Invoke(e);
     }
 }
