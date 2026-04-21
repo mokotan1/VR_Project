@@ -41,6 +41,10 @@ namespace VRProject.Presentation.Gameplay
         SuperhotFlatFpsController _flatPlayer;
         Transform _playerTransform;
         Vector3 _lastSoundOrigin;
+        float _losConfirmTimer;
+        float _losLostTimer;
+        float _flankSearchCooldown;
+        Vector3? _cachedFlankCorner;
 
         void Awake()
         {
@@ -112,9 +116,16 @@ namespace VRProject.Presentation.Gameplay
 
             if (HasLOS())
             {
-                SetState(EnemyState.Engaging);
+                _losConfirmTimer += Time.deltaTime;
+                if (_losConfirmTimer >= 0.2f)
+                {
+                    _losConfirmTimer = 0f;
+                    SetState(EnemyState.Engaging);
+                }
                 return;
             }
+
+            _losConfirmTimer = 0f;
 
             var corner = FindFlankCorner();
             if (corner.HasValue)
@@ -150,9 +161,16 @@ namespace VRProject.Presentation.Gameplay
 
             if (!HasLOS())
             {
-                SetState(EnemyState.Investigating);
+                _losLostTimer += Time.deltaTime;
+                if (_losLostTimer >= 0.3f)
+                {
+                    _losLostTimer = 0f;
+                    SetState(EnemyState.Investigating);
+                }
                 return;
             }
+
+            _losLostTimer = 0f;
 
             var strafeDir = ComputeStrafeDir();
             if (strafeDir.sqrMagnitude > 1e-4f)
@@ -170,7 +188,6 @@ namespace VRProject.Presentation.Gameplay
         {
             if (_playerTransform == null || !HasLOS())
             {
-                ReleaseTakedown();
                 SetState(EnemyState.Idle);
                 return;
             }
@@ -182,7 +199,7 @@ namespace VRProject.Presentation.Gameplay
 
         void MoveAlongPath(float dt, float speed)
         {
-            if (_agent.pathPending || _agent.remainingDistance < 0.05f)
+            if (_agent.pathPending || !_agent.hasPath || _agent.remainingDistance < 0.05f)
                 return;
 
             var desiredVel = _agent.desiredVelocity;
@@ -220,8 +237,17 @@ namespace VRProject.Presentation.Gameplay
 
         Vector3? FindFlankCorner()
         {
+            _flankSearchCooldown -= Time.deltaTime;
+            if (_flankSearchCooldown > 0f)
+                return _cachedFlankCorner;
+
+            _flankSearchCooldown = 0.2f;
+
             if (_playerTransform == null)
+            {
+                _cachedFlankCorner = null;
                 return null;
+            }
 
             Vector3? best = null;
             float bestDist = float.MaxValue;
@@ -251,6 +277,7 @@ namespace VRProject.Presentation.Gameplay
                 }
             }
 
+            _cachedFlankCorner = best;
             return best;
         }
 
