@@ -361,6 +361,12 @@ namespace VRProject.Presentation.Gameplay
                     _playerTransform = flat.transform;
                     _flatPlayer = flat;
                 }
+                else
+                {
+                    var playerGo = GameObject.FindGameObjectWithTag("Player");
+                    if (playerGo != null)
+                        _playerTransform = playerGo.transform;
+                }
             }
         }
     }

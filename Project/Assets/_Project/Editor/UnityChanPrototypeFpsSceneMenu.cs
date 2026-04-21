@@ -410,16 +410,7 @@ namespace VRProject.EditorTools
                 if (litShader != null)
                     vis.GetComponent<MeshRenderer>().sharedMaterial = new Material(litShader) { color = new Color(0.72f, 0.12f, 0.1f) };
 
-                var muzzle = new GameObject("Muzzle");
-                muzzle.transform.SetParent(root.transform, false);
-                muzzle.transform.localPosition = new Vector3(0f, 1.45f, 0.35f);
-
-                var ai = root.AddComponent<PrototypeEnemyAi>();
-                var so = new SerializedObject(ai);
-                so.FindProperty("_muzzle").objectReferenceValue = muzzle.transform;
-                so.ApplyModifiedPropertiesWithoutUndo();
-
-                ai.SetCoverPoints(covers);
+                root.AddComponent<SuperhotEnemyBrain>();
 
                 if (enemyLayer >= 0)
                     SetLayerRecursively(root, enemyLayer);
@@ -568,6 +559,7 @@ namespace VRProject.EditorTools
             aimSo.ApplyModifiedPropertiesWithoutUndo();
 
             player.AddComponent<PrototypeFpsPlayerHealth>();
+            player.AddComponent<SuperhotPlayerSoundEmitter>();
             var weapon = player.AddComponent<OsFpsInspiredWeapon>();
             var wSo = new SerializedObject(weapon);
             wSo.FindProperty("_camera").objectReferenceValue = cam;

@@ -14,6 +14,7 @@ namespace VRProject.Presentation.Gameplay
         float _emitTimer;
         Vector3 _lastHmdPos;
         Transform _hmd;
+        Vector3 _lastGenericPos;
 
         void Awake()
         {
@@ -22,6 +23,8 @@ namespace VRProject.Presentation.Gameplay
 
         void OnEnable()
         {
+            _lastGenericPos = transform.position;
+
             if (XRSettings.isDeviceActive)
             {
                 var origin = FindAnyObjectByType<Unity.XR.CoreUtils.XROrigin>();
@@ -73,7 +76,13 @@ namespace VRProject.Presentation.Gameplay
                 return speed;
             }
 
-            return 0f;
+            // Generic fallback: track this transform's world position delta
+            {
+                var udt = Mathf.Max(Time.unscaledDeltaTime, 1e-6f);
+                var speed = (transform.position - _lastGenericPos).magnitude / udt;
+                _lastGenericPos = transform.position;
+                return speed;
+            }
         }
     }
 }
