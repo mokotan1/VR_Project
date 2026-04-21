@@ -6,6 +6,7 @@ using Unity.XR.CoreUtils;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.AI;
 using UnityEngine.SceneManagement;
 using UnityEngine.XR.Interaction.Toolkit;
 using UnityEngine.XR.Interaction.Toolkit.Interactables;
@@ -306,6 +307,7 @@ namespace VRProject.EditorTools
             root.AddComponent<SuperhotFlatPlaytestRig>();
             root.AddComponent<SuperhotFlatFpsController>();
             root.AddComponent<SuperhotFlatHitscanWeapon>();
+            root.AddComponent<SuperhotPlayerSoundEmitter>();
 
             var camGo = new GameObject("Main Camera");
             camGo.transform.SetParent(root.transform, false);
@@ -452,6 +454,10 @@ namespace VRProject.EditorTools
                 cap.AddComponent<SuperhotEnemy>();
                 cap.AddComponent<SuperhotEnemyMover>();
                 cap.AddComponent<SuperhotEnemyShooter>();
+                var agent = cap.AddComponent<NavMeshAgent>();
+                agent.angularSpeed = 360f;
+                agent.stoppingDistance = 0.3f;
+                cap.AddComponent<SuperhotEnemyBrain>();
                 var shardBurst = AssetDatabase.LoadAssetAtPath<GameObject>(GlassShardBurstPrefabPath);
                 if (shardBurst != null)
                 {
