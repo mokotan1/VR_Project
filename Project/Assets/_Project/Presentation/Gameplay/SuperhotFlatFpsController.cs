@@ -37,6 +37,8 @@ namespace VRProject.Presentation.Gameplay
         Vector3 _velocity;
         IGameplayClock _clock;
 
+        public float SpeedMultiplier { get; set; } = 1f;
+
         public float LastPlanarSpeedMetersPerSecond { get; private set; }
 
         public float LastLookIntensityPerSecond { get; private set; }
@@ -120,7 +122,7 @@ namespace VRProject.Presentation.Gameplay
                 _velocity.y += _gravity * dt;
 
             var input = new Vector3(Input.GetAxis("Horizontal"), 0f, Input.GetAxis("Vertical"));
-            var move = transform.TransformDirection(input) * _moveSpeed;
+            var move = transform.TransformDirection(input) * (_moveSpeed * SpeedMultiplier);
             move.y = _velocity.y;
             _characterController.Move(move * dt);
 
