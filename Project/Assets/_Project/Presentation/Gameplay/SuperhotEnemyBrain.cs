@@ -29,7 +29,7 @@ namespace VRProject.Presentation.Gameplay
         [SerializeField] float _takedownSpeedPenalty = 0.25f;
 
         [Header("Player References")]
-        [Tooltip("플레이어 총의 FirePoint Transform. 없으면 플레이어 Transform.right 사용")]
+        [Tooltip("플레이어 총의 FirePoint Transform. 비우면 장착 중인 무기가 브로드캐스트한 총구를 사용하고, 그것도 없으면 플레이어 몸통 right")]
         [SerializeField] Transform _playerFirePoint;
 
         enum EnemyState { Idle, Investigating, FlankToCorner, Engaging, CloseRange }
@@ -285,8 +285,9 @@ namespace VRProject.Presentation.Gameplay
         {
             Vector3 gunRight;
 
-            if (_playerFirePoint != null)
-                gunRight = _playerFirePoint.right;
+            var firePoint = _playerFirePoint != null ? _playerFirePoint : PlayerWeaponFirePointForAi.ActiveMuzzle;
+            if (firePoint != null)
+                gunRight = firePoint.right;
             else if (_playerTransform != null)
                 gunRight = _playerTransform.right;
             else
@@ -341,6 +342,21 @@ namespace VRProject.Presentation.Gameplay
             if (_state == EnemyState.CloseRange)
                 ApplyTakedown();
         }
+
+        /// <summary>개발자 HUD용 — 적 이동·내비 상태.</summary>
+        public string DebugStateName => _state.ToString();
+
+        public float DebugRemainingDistance => _agent != null ? _agent.remainingDistance : 0f;
+
+        public bool DebugHasPath => _agent != null && _agent.hasPath;
+
+        public bool DebugPathPending => _agent != null && _agent.pathPending;
+
+        public bool DebugAgentStopped => _agent != null && _agent.isStopped;
+
+        public Vector3 DebugDesiredVelocity => _agent != null ? _agent.desiredVelocity : Vector3.zero;
+
+        public Vector3 DebugNavDestination => _agent != null ? _agent.destination : Vector3.zero;
 
         void RefreshPlayerRef()
         {

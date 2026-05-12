@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.Rendering;
+using VRProject.Presentation.Gameplay;
 using VRProject.Presentation.PrototypeFps;
 
 namespace VRProject.Presentation.OsFpsInspired
@@ -209,6 +210,15 @@ namespace VRProject.Presentation.OsFpsInspired
         void LateUpdate()
         {
             ApplyHandGunViewmodelOffset();
+            if (_equipped && _handGunVisual != null && _handGunVisual.activeInHierarchy)
+                PlayerWeaponFirePointForAi.Publish(this, ResolveMuzzleTransform());
+            else
+                PlayerWeaponFirePointForAi.ClearIfOwner(this);
+        }
+
+        void OnDestroy()
+        {
+            PlayerWeaponFirePointForAi.ClearIfOwner(this);
         }
 
         Transform ResolveMuzzleTransform()
