@@ -105,15 +105,36 @@ namespace VRProject.Presentation.Gameplay
             if (_volume == null)
                 _volume = GetComponentInChildren<Volume>();
 
+            if (_volume == null)
+            {
+                _volume = gameObject.AddComponent<Volume>();
+                _volume.isGlobal = true;
+                _volume.priority = 100f;
+            }
+
             if (_volumeProfile == null && _volume != null)
                 _volumeProfile = _volume.profile;
+
+            if (_volumeProfile == null && _volume != null)
+            {
+                _volumeProfile = ScriptableObject.CreateInstance<VolumeProfile>();
+                _volumeProfile.name = "RuntimeWeaponFireScreenImpulseProfile";
+                _volume.profile = _volumeProfile;
+            }
 
             if (_volumeProfile == null)
                 return;
 
-            _volumeProfile.TryGet(out _lensDistortion);
-            _volumeProfile.TryGet(out _chromaticAberration);
-            _volumeProfile.TryGet(out _vignette);
+            if (!_volumeProfile.TryGet(out _lensDistortion))
+                _lensDistortion = _volumeProfile.Add<LensDistortion>(true);
+            if (!_volumeProfile.TryGet(out _chromaticAberration))
+                _chromaticAberration = _volumeProfile.Add<ChromaticAberration>(true);
+            if (!_volumeProfile.TryGet(out _vignette))
+                _vignette = _volumeProfile.Add<Vignette>(true);
+
+            _lensDistortion.active = true;
+            _chromaticAberration.active = true;
+            _vignette.active = true;
         }
 
         void CaptureBasePose()
