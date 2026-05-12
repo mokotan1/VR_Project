@@ -1,7 +1,0 @@
-fastapi
-uvicorn[standard]
-websockets
-httpx
-faster-whisper
-pydantic
-pydantic-settings
