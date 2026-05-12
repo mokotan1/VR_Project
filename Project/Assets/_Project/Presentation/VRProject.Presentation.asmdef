@@ -9,6 +9,8 @@
         "Unity.InputSystem",
         "Unity.XR.CoreUtils",
         "UnityEngine.UI",
+        "Unity.RenderPipelines.Core.Runtime",
+        "Unity.RenderPipelines.Universal.Runtime",
         "UniRx",
         "DyrdaDev.FirstPersonController.Runtime"
     ],

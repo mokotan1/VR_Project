@@ -16,6 +16,9 @@ namespace VRProject.Presentation.Gameplay
         [Tooltip("발사 직후 이 시간(실시간 초) 동안 시간 배율 목표를 1로 고정하는 데 쓰입니다.")]
         [SerializeField] float _fullTimeScaleHoldSeconds = 0.15f;
 
+        [Header("발사 화면 연출")]
+        [SerializeField] WeaponFireScreenImpulse _screenImpulse;
+
         float _lastShootUnscaledTime = -1e9f;
 
         /// <summary><see cref="_fullTimeScaleHoldSeconds"/> 구간 안이면 true.</summary>
@@ -26,6 +29,8 @@ namespace VRProject.Presentation.Gameplay
         {
             if (_camera == null)
                 _camera = Camera.main;
+            if (_screenImpulse == null)
+                _screenImpulse = GetComponentInParent<WeaponFireScreenImpulse>();
         }
 
         void Update()
@@ -37,6 +42,7 @@ namespace VRProject.Presentation.Gameplay
                 return;
 
             _lastShootUnscaledTime = Time.unscaledTime;
+            _screenImpulse?.Trigger();
 
             var cam = _camera != null ? _camera : Camera.main;
             if (cam == null)

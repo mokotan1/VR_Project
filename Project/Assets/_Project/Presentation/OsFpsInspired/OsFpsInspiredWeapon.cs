@@ -18,6 +18,9 @@ namespace VRProject.Presentation.OsFpsInspired
         [Tooltip("총구 위치. 비우면 총 모델 안에서 이름으로 찾거나, 메시 크기로 대략 잡습니다.")]
         [SerializeField] Transform _muzzleTransform;
 
+        [Header("발사 화면 연출")]
+        [SerializeField] WeaponFireScreenImpulse _screenImpulse;
+
         [Header("뷰모델 위치 (인스펙터 조정)")]
         [Tooltip("플레이 시작·장착 시 잡힌 총 로컬 위치에 더해집니다. 카메라 앞 스냅 위치를 코드 없이 맞출 때 사용합니다.")]
         [SerializeField] Vector3 _handGunLocalPositionOffset;
@@ -127,6 +130,8 @@ namespace VRProject.Presentation.OsFpsInspired
         {
             if (_camera == null)
                 _camera = GetComponentInChildren<Camera>();
+            if (_screenImpulse == null)
+                _screenImpulse = GetComponentInParent<WeaponFireScreenImpulse>();
             _motor = UnityChanLocomotionMotorResolver.ResolveOn(gameObject);
             _hitscanExclusionRoot = _hitscanExclusionRootOverride != null
                 ? _hitscanExclusionRootOverride
@@ -353,6 +358,7 @@ namespace VRProject.Presentation.OsFpsInspired
             _nextFire = Time.unscaledTime + _fireCooldown;
             _ammoInMag--;
             _lastFireUnscaledTime = Time.unscaledTime;
+            _screenImpulse?.Trigger();
 
             // 총구 forward는 손 본 애니 때문에 아래/옆으로 틀어질 수 있음 → 조준은 항상 카메라 십자(뷰포트 중앙) 방향.
             var aimRay = cam.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0f));
