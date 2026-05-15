@@ -6,8 +6,8 @@ namespace VRProject.Presentation.Gameplay
     [DisallowMultipleComponent]
     public sealed class SuperhotPlayerSoundEmitter : MonoBehaviour
     {
-        [SerializeField] float _soundRadius = 32f;
-        [SerializeField] float _moveSpeedThreshold = 0.05f;
+        [SerializeField] float _soundRadius = 12f;
+        [SerializeField] float _moveSpeedThreshold = 0.15f;
         [SerializeField] float _emitInterval = 0.15f;
 
         SuperhotFlatFpsController _flatController;

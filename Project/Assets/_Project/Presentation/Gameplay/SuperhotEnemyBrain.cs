@@ -3,7 +3,6 @@ using UnityEngine.AI;
 using UnityEngine.XR;
 using VRProject.Domain.Gameplay;
 using VRProject.Infrastructure.DI;
-using VRProject.Presentation.PrototypeFps;
 
 namespace VRProject.Presentation.Gameplay
 {
@@ -14,8 +13,6 @@ namespace VRProject.Presentation.Gameplay
         [Header("Detection")]
         [SerializeField] float _hearingRadius = 12f;
         [SerializeField] float _losRange = 20f;
-        [SerializeField] float _movementReactionRadius = 32f;
-        [SerializeField] float _playerMoveReactionThreshold = 0.04f;
         [SerializeField] LayerMask _obstacleMask = ~0;
 
         [Header("Movement Speed")]
@@ -28,7 +25,6 @@ namespace VRProject.Presentation.Gameplay
         [SerializeField] int _cornerCandidateCount = 8;
 
         [Header("Close Range")]
-        [SerializeField] float _closePressureRange = 6f;
         [SerializeField] float _takedownRange = 1.5f;
         [SerializeField] float _takedownSpeedPenalty = 0.25f;
 
@@ -43,11 +39,8 @@ namespace VRProject.Presentation.Gameplay
         IGameplayClock _clock;
         SuperhotEnemyMover _legacyMover;
         SuperhotFlatFpsController _flatPlayer;
-        IUnityChanLocomotionMotor _unityChanMotor;
         Transform _playerTransform;
         Vector3 _lastSoundOrigin;
-        Vector3 _lastPlayerPosition;
-        bool _hasLastPlayerPosition;
         float _losConfirmTimer;
         float _losLostTimer;
         float _flankSearchCooldown;
@@ -81,15 +74,9 @@ namespace VRProject.Presentation.Gameplay
         void Update()
         {
             RefreshPlayerRef();
-            TrackPlayerMovement();
-
-            if (_agent == null || !_agent.isActiveAndEnabled || !_agent.isOnNavMesh)
-                return;
-
             _agent.nextPosition = transform.position;
 
             var dt = _clock != null ? _clock.SimulationDeltaTime : Time.deltaTime;
-            Tick_PassiveAwareness();
 
             switch (_state)
             {
@@ -115,32 +102,10 @@ namespace VRProject.Presentation.Gameplay
             if (_state == EnemyState.CloseRange)
                 return;
 
-            var radius = Mathf.Max(_hearingRadius, e.Radius);
-            if (Vector3.Distance(transform.position, e.Origin) > radius)
+            if (Vector3.Distance(transform.position, e.Origin) > _hearingRadius)
                 return;
 
             _lastSoundOrigin = e.Origin;
-            SetState(EnemyState.Investigating);
-        }
-
-        void Tick_PassiveAwareness()
-        {
-            if (_state != EnemyState.Idle || _playerTransform == null)
-                return;
-
-            if (CheckAndEnterCloseRange())
-                return;
-
-            if (HasLOS())
-            {
-                SetState(EnemyState.Engaging);
-                return;
-            }
-
-            if (!PlayerMovedWithinReactionRadius())
-                return;
-
-            _lastSoundOrigin = _playerTransform.position;
             SetState(EnemyState.Investigating);
         }
 
@@ -171,7 +136,7 @@ namespace VRProject.Presentation.Gameplay
             else
             {
                 _agent.SetDestination(_lastSoundOrigin);
-                SetState(EnemyState.FlankToCorner);
+                SetState(EnemyState.Engaging);
             }
         }
 
@@ -207,14 +172,6 @@ namespace VRProject.Presentation.Gameplay
 
             _losLostTimer = 0f;
 
-            if (DistanceToPlayer() <= _closePressureRange)
-            {
-                _agent.SetDestination(_playerTransform.position);
-                MoveAlongPath(dt, _closeSpeed);
-                FacePlayer();
-                return;
-            }
-
             var strafeDir = ComputeStrafeDir();
             if (strafeDir.sqrMagnitude > 1e-4f)
             {
@@ -247,18 +204,9 @@ namespace VRProject.Presentation.Gameplay
 
             var desiredVel = _agent.desiredVelocity;
             if (desiredVel.sqrMagnitude < 1e-4f)
-            {
-                desiredVel = _agent.steeringTarget - transform.position;
-                desiredVel.y = 0f;
-            }
-
-            if (desiredVel.sqrMagnitude < 1e-4f)
-                desiredVel = _agent.destination - transform.position;
-            desiredVel.y = 0f;
-            if (desiredVel.sqrMagnitude < 1e-4f)
                 return;
+
             transform.position += desiredVel.normalized * (speed * dt);
-            _agent.nextPosition = transform.position;
         }
 
         void FacePlayer()
@@ -361,44 +309,10 @@ namespace VRProject.Presentation.Gameplay
             return true;
         }
 
-        float DistanceToPlayer()
-        {
-            if (_playerTransform == null)
-                return float.MaxValue;
-
-            return Vector3.Distance(transform.position, _playerTransform.position);
-        }
-
-        void TrackPlayerMovement()
-        {
-            if (_playerTransform == null)
-                return;
-
-            if (!_hasLastPlayerPosition)
-            {
-                _lastPlayerPosition = _playerTransform.position;
-                _hasLastPlayerPosition = true;
-            }
-        }
-
-        bool PlayerMovedWithinReactionRadius()
-        {
-            if (_playerTransform == null || !_hasLastPlayerPosition)
-                return false;
-
-            var moved = Vector3.Distance(_playerTransform.position, _lastPlayerPosition);
-            _lastPlayerPosition = _playerTransform.position;
-            if (moved < _playerMoveReactionThreshold)
-                return false;
-
-            return Vector3.Distance(transform.position, _playerTransform.position) <= _movementReactionRadius;
-        }
-
         void ApplyTakedown()
         {
             if (_flatPlayer != null)
                 _flatPlayer.SpeedMultiplier = _takedownSpeedPenalty;
-            _unityChanMotor?.SetMotorLocked(true);
 
             if (XRSettings.isDeviceActive)
             {
@@ -413,7 +327,6 @@ namespace VRProject.Presentation.Gameplay
         {
             if (_flatPlayer != null)
                 _flatPlayer.SpeedMultiplier = 1f;
-            _unityChanMotor?.SetMotorLocked(false);
         }
 
         void SetState(EnemyState next)
@@ -433,29 +346,17 @@ namespace VRProject.Presentation.Gameplay
         /// <summary>개발자 HUD용 — 적 이동·내비 상태.</summary>
         public string DebugStateName => _state.ToString();
 
-        public float DebugRemainingDistance => DebugAgentIsUsable ? DebugAgent.remainingDistance : 0f;
+        public float DebugRemainingDistance => _agent != null ? _agent.remainingDistance : 0f;
 
-        public bool DebugHasPath => DebugAgentIsUsable && DebugAgent.hasPath;
+        public bool DebugHasPath => _agent != null && _agent.hasPath;
 
-        public bool DebugPathPending => DebugAgentIsUsable && DebugAgent.pathPending;
+        public bool DebugPathPending => _agent != null && _agent.pathPending;
 
-        public bool DebugAgentStopped => DebugAgentIsUsable && DebugAgent.isStopped;
+        public bool DebugAgentStopped => _agent != null && _agent.isStopped;
 
-        public Vector3 DebugDesiredVelocity => DebugAgentIsUsable ? DebugAgent.desiredVelocity : Vector3.zero;
+        public Vector3 DebugDesiredVelocity => _agent != null ? _agent.desiredVelocity : Vector3.zero;
 
-        public Vector3 DebugNavDestination => DebugAgentIsUsable ? DebugAgent.destination : Vector3.zero;
-
-        public bool DebugAgentIsUsable => DebugAgent != null && DebugAgent.isActiveAndEnabled && DebugAgent.isOnNavMesh;
-
-        NavMeshAgent DebugAgent
-        {
-            get
-            {
-                if (_agent == null)
-                    TryGetComponent(out _agent);
-                return _agent;
-            }
-        }
+        public Vector3 DebugNavDestination => _agent != null ? _agent.destination : Vector3.zero;
 
         void RefreshPlayerRef()
         {
@@ -480,26 +381,9 @@ namespace VRProject.Presentation.Gameplay
                 {
                     var playerGo = GameObject.FindGameObjectWithTag("Player");
                     if (playerGo != null)
-                    {
                         _playerTransform = playerGo.transform;
-                        _unityChanMotor = FindUnityChanMotor(playerGo);
-                    }
                 }
             }
-        }
-
-        static IUnityChanLocomotionMotor FindUnityChanMotor(GameObject playerGo)
-        {
-            if (playerGo == null)
-                return null;
-
-            foreach (var mb in playerGo.GetComponents<MonoBehaviour>())
-            {
-                if (mb is IUnityChanLocomotionMotor motor)
-                    return motor;
-            }
-
-            return null;
         }
     }
 }

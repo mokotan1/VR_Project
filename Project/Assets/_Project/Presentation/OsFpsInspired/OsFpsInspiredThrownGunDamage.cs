@@ -38,7 +38,7 @@ namespace VRProject.Presentation.OsFpsInspired
             if (OsFpsInspiredHitscanExclusion.IsColliderUnderExclusionRoot(col, _shooterExclusionRoot))
                 return;
 
-            var dmg = OsFpsInspiredDamageReceiver.FindInParents(col);
+            var dmg = col.GetComponentInParent<OsFpsInspiredDamageable>();
             if (dmg == null)
                 return;
 

@@ -11,7 +11,6 @@ using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 using DyrdaDev.FirstPersonController;
 using VRProject.Presentation.Common.Managers;
-using VRProject.Presentation.Common.UI;
 using VRProject.Presentation.Gameplay;
 using VRProject.Presentation.OsFpsInspired;
 using VRProject.Presentation.PrototypeFps;
@@ -38,8 +37,6 @@ namespace VRProject.EditorTools
         const string BulletPackPrefab02Path = "Assets/DuNguyn/Bullets Pack/Prefabs/SM_Bullet_02.prefab";
         const string BulletPackPrefab03Path = "Assets/DuNguyn/Bullets Pack/Prefabs/SM_Bullet_03.prefab";
         const string BulletPackPrefab010Path = "Assets/DuNguyn/Bullets Pack/Prefabs/SM_Bullet_010.prefab";
-        const string EnvironmentLayerName = "Environment";
-        const int DefaultEnvironmentLayerIndex = 9;
 
         /// <summary>Bullets Pack meshes are small in source assets; keep scale modest so the pile reads as table props.</summary>
         const float BulletPackDecorationScale = 2.5f;
@@ -47,7 +44,7 @@ namespace VRProject.EditorTools
         [MenuItem("VR Project/Scenes/Create Unity-Chan Prototype FPS")]
         public static void CreateScene()
         {
-            EnsureProjectTagsAndLayersExist(new[] { "Player", "Enemy" }, EnvironmentLayerName);
+            EnsureProjectTagsExist("Player", "Enemy");
 
             var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
 
@@ -77,7 +74,6 @@ namespace VRProject.EditorTools
             var systems = new GameObject("Systems");
             systems.AddComponent<GameBootstrapper>();
             systems.AddComponent<SuperhotGameplayDriver>();
-            systems.AddComponent<SuperhotDevModeHUD>();
 
             var covers = BuildCoverPoints();
             covers.transform.SetParent(navRoot.transform, false);
@@ -121,7 +117,7 @@ namespace VRProject.EditorTools
         [MenuItem("VR Project/Scenes/Create Unity-Chan Prototype FPS (Hand-held HK416 on rig)")]
         public static void CreateSceneHandHeldRifle()
         {
-            EnsureProjectTagsAndLayersExist(new[] { "Player", "Enemy" }, EnvironmentLayerName);
+            EnsureProjectTagsExist("Player", "Enemy");
 
             var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
 
@@ -151,7 +147,6 @@ namespace VRProject.EditorTools
             var systems = new GameObject("Systems");
             systems.AddComponent<GameBootstrapper>();
             systems.AddComponent<SuperhotGameplayDriver>();
-            systems.AddComponent<SuperhotDevModeHUD>();
 
             var covers = BuildCoverPoints();
             covers.transform.SetParent(navRoot.transform, false);
@@ -194,7 +189,7 @@ namespace VRProject.EditorTools
         [MenuItem("VR Project/Scenes/Create Unity-Chan Prototype FPS (Dyrda FPC)")]
         public static void CreateSceneDyrdaFpc()
         {
-            EnsureProjectTagsAndLayersExist(new[] { "Player", "Enemy" }, EnvironmentLayerName);
+            EnsureProjectTagsExist("Player", "Enemy");
 
             var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
 
@@ -224,7 +219,6 @@ namespace VRProject.EditorTools
             var systems = new GameObject("Systems");
             systems.AddComponent<GameBootstrapper>();
             systems.AddComponent<SuperhotGameplayDriver>();
-            systems.AddComponent<SuperhotDevModeHUD>();
 
             var covers = BuildCoverPoints();
             covers.transform.SetParent(navRoot.transform, false);
@@ -306,10 +300,6 @@ namespace VRProject.EditorTools
 
         static void MarkNavigationStatic(GameObject go)
         {
-            var environmentLayer = LayerMask.NameToLayer(EnvironmentLayerName);
-            if (environmentLayer >= 0)
-                go.layer = environmentLayer;
-
             var flags = GameObjectUtility.GetStaticEditorFlags(go);
             GameObjectUtility.SetStaticEditorFlags(go, flags | StaticEditorFlags.NavigationStatic);
         }
@@ -420,34 +410,13 @@ namespace VRProject.EditorTools
                 if (litShader != null)
                     vis.GetComponent<MeshRenderer>().sharedMaterial = new Material(litShader) { color = new Color(0.72f, 0.12f, 0.1f) };
 
-                var brain = root.AddComponent<SuperhotEnemyBrain>();
-                ConfigureEnemyBrainForUnityChanTestScene(brain);
+                root.AddComponent<SuperhotEnemyBrain>();
 
                 if (enemyLayer >= 0)
                     SetLayerRecursively(root, enemyLayer);
 
-                root.SetActive(true);
+                root.SetActive(false);
             }
-        }
-
-        static void ConfigureEnemyBrainForUnityChanTestScene(SuperhotEnemyBrain brain)
-        {
-            if (brain == null)
-                return;
-
-            var environmentLayer = LayerMask.NameToLayer(EnvironmentLayerName);
-            if (environmentLayer < 0)
-                return;
-
-            var so = new SerializedObject(brain);
-            so.FindProperty("_hearingRadius").floatValue = 32f;
-            so.FindProperty("_losRange").floatValue = 36f;
-            so.FindProperty("_movementReactionRadius").floatValue = 32f;
-            so.FindProperty("_playerMoveReactionThreshold").floatValue = 0.02f;
-            so.FindProperty("_obstacleMask").intValue = 1 << environmentLayer;
-            so.FindProperty("_closePressureRange").floatValue = 7f;
-            so.FindProperty("_takedownRange").floatValue = 1.7f;
-            so.ApplyModifiedPropertiesWithoutUndo();
         }
 
         static void SetLayerRecursively(GameObject go, int layer)
@@ -1124,69 +1093,35 @@ namespace VRProject.EditorTools
             }
         }
 
-        static void EnsureProjectTagsAndLayersExist(string[] tags, string environmentLayerName)
+        static void EnsureProjectTagsExist(params string[] tags)
         {
             var so = new SerializedObject(
                 AssetDatabase.LoadAllAssetsAtPath("ProjectSettings/TagManager.asset")[0]);
             var tagsProp = so.FindProperty("tags");
-            if (tagsProp != null && tagsProp.isArray)
-            {
-                foreach (var tag in tags)
-                {
-                    if (string.IsNullOrEmpty(tag))
-                        continue;
-                    var found = false;
-                    for (var i = 0; i < tagsProp.arraySize; i++)
-                    {
-                        if (tagsProp.GetArrayElementAtIndex(i).stringValue == tag)
-                        {
-                            found = true;
-                            break;
-                        }
-                    }
-
-                    if (found)
-                        continue;
-                    tagsProp.InsertArrayElementAtIndex(tagsProp.arraySize);
-                    tagsProp.GetArrayElementAtIndex(tagsProp.arraySize - 1).stringValue = tag;
-                }
-            }
-
-            EnsureLayerExists(so, environmentLayerName, DefaultEnvironmentLayerIndex);
-            so.ApplyModifiedProperties();
-        }
-
-        static void EnsureLayerExists(SerializedObject tagManager, string layerName, int preferredIndex)
-        {
-            if (string.IsNullOrEmpty(layerName))
+            if (tagsProp == null || !tagsProp.isArray)
                 return;
 
-            var layers = tagManager.FindProperty("layers");
-            if (layers == null || !layers.isArray)
-                return;
-
-            for (var i = 0; i < layers.arraySize; i++)
+            foreach (var tag in tags)
             {
-                if (layers.GetArrayElementAtIndex(i).stringValue == layerName)
-                    return;
-            }
-
-            if (preferredIndex >= 8 && preferredIndex < layers.arraySize &&
-                string.IsNullOrEmpty(layers.GetArrayElementAtIndex(preferredIndex).stringValue))
-            {
-                layers.GetArrayElementAtIndex(preferredIndex).stringValue = layerName;
-                return;
-            }
-
-            for (var i = 8; i < layers.arraySize; i++)
-            {
-                if (!string.IsNullOrEmpty(layers.GetArrayElementAtIndex(i).stringValue))
+                if (string.IsNullOrEmpty(tag))
                     continue;
-                layers.GetArrayElementAtIndex(i).stringValue = layerName;
-                return;
+                var found = false;
+                for (var i = 0; i < tagsProp.arraySize; i++)
+                {
+                    if (tagsProp.GetArrayElementAtIndex(i).stringValue == tag)
+                    {
+                        found = true;
+                        break;
+                    }
+                }
+
+                if (found)
+                    continue;
+                tagsProp.InsertArrayElementAtIndex(tagsProp.arraySize);
+                tagsProp.GetArrayElementAtIndex(tagsProp.arraySize - 1).stringValue = tag;
             }
 
-            Debug.LogWarning("[VR Project] No free user layer for \"" + layerName + "\". Enemy LOS mask will keep its fallback.");
+            so.ApplyModifiedProperties();
         }
 
         static void AddToBuildSettings(string scenePath)
@@ -1199,72 +1134,17 @@ namespace VRProject.EditorTools
                 return;
             }
 
-            var list = new List<EditorBuildSettingsScene>
-            {
-                new EditorBuildSettingsScene(scenePath, true)
-            };
-
             foreach (var s in EditorBuildSettings.scenes)
             {
                 if (s.path == scenePath)
-                    continue;
-                list.Add(s);
+                    return;
             }
 
+            var list = new List<EditorBuildSettingsScene>(EditorBuildSettings.scenes)
+            {
+                new EditorBuildSettingsScene(scenePath, true)
+            };
             EditorBuildSettings.scenes = list.ToArray();
-        }
-
-        [MenuItem("VR Project/Scenes/Set Unity-Chan Prototype FPS as Main Test Scene")]
-        public static void SetUnityChanPrototypeFpsAsMainTestScene()
-        {
-            AddToBuildSettings(ScenePath);
-            EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
-            Debug.Log("[VR Project] Main test scene set to build index 0 and opened: " + ScenePath);
-        }
-
-        public static void ValidateUnityChanPrototypeFpsMainTestScene()
-        {
-            var scene = EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
-            if (!scene.IsValid() || !scene.isLoaded)
-                throw new InvalidOperationException("Could not open " + ScenePath);
-
-            if (EditorBuildSettings.scenes.Length == 0 || EditorBuildSettings.scenes[0].path != ScenePath ||
-                !EditorBuildSettings.scenes[0].enabled)
-                throw new InvalidOperationException(ScenePath + " is not enabled at build index 0.");
-
-            var player = GameObject.FindGameObjectWithTag("Player");
-            if (player == null)
-                throw new InvalidOperationException("No active Player-tagged GameObject in " + ScenePath);
-            if (player.GetComponent<SuperhotPlayerSoundEmitter>() == null)
-                throw new InvalidOperationException("Player is missing SuperhotPlayerSoundEmitter.");
-
-            if (UnityEngine.Object.FindFirstObjectByType<SuperhotDevModeHUD>() == null)
-                throw new InvalidOperationException("Scene is missing SuperhotDevModeHUD dev overlay.");
-
-            var surfaces = UnityEngine.Object.FindObjectsByType<NavMeshSurface>(FindObjectsInactive.Include, FindObjectsSortMode.None);
-            if (surfaces.Length == 0)
-                throw new InvalidOperationException("No NavMeshSurface in " + ScenePath);
-            foreach (var surface in surfaces)
-            {
-                if (surface.navMeshData == null)
-                    throw new InvalidOperationException(surface.name + " has no baked NavMeshData.");
-            }
-
-            var brains = UnityEngine.Object.FindObjectsByType<SuperhotEnemyBrain>(FindObjectsInactive.Include, FindObjectsSortMode.None);
-            if (brains.Length == 0)
-                throw new InvalidOperationException("No SuperhotEnemyBrain enemies in " + ScenePath);
-            foreach (var brain in brains)
-            {
-                if (!brain.gameObject.activeInHierarchy)
-                    throw new InvalidOperationException(brain.name + " is inactive; it will not hear or move.");
-                if (!brain.TryGetComponent<NavMeshAgent>(out var agent))
-                    throw new InvalidOperationException(brain.name + " is missing NavMeshAgent.");
-                if (!NavMesh.SamplePosition(brain.transform.position, out _, 1.5f, NavMesh.AllAreas))
-                    throw new InvalidOperationException(brain.name + " is not near baked NavMesh.");
-            }
-
-            Debug.Log("[VR Project] Unity-Chan main test scene validation passed. enemies=" + brains.Length +
-                      " navSurfaces=" + surfaces.Length);
         }
     }
 }

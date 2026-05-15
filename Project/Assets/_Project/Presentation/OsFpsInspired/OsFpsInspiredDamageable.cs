@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace VRProject.Presentation.OsFpsInspired
 {
-    public sealed class OsFpsInspiredDamageable : MonoBehaviour, IOsFpsInspiredDamageReceiver
+    public sealed class OsFpsInspiredDamageable : MonoBehaviour
     {
         [SerializeField] float _maxHealth = 100f;
         float _health;
