@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using VRProject.Presentation.Gameplay;
 
 namespace VRProject.Presentation.Common.UI
@@ -142,7 +143,7 @@ namespace VRProject.Presentation.Common.UI
                 var d = brain.DebugNavDestination;
                 GUILayout.Label(
                     $"[{brain.name}]{(off ? " (비활성)" : "")}  {brain.DebugStateName}\n" +
-                    $"  path pend={brain.DebugPathPending} stop={brain.DebugAgentStopped} has={brain.DebugHasPath} rem={brain.DebugRemainingDistance:F2}\n" +
+                    $"  nav={(brain.DebugAgentIsUsable ? "ready" : "wait")} path pend={brain.DebugPathPending} stop={brain.DebugAgentStopped} has={brain.DebugHasPath} rem={brain.DebugRemainingDistance:F2}\n" +
                     $"  desiredVel xz=({v.x:F2},{v.z:F2})  dest xz=({d.x:F1},{d.z:F1})");
                 GUILayout.Space(4f);
             }
@@ -156,8 +157,48 @@ namespace VRProject.Presentation.Common.UI
             if (Time.unscaledTime < _nextEnemyRescanUnscaled)
                 return;
             _nextEnemyRescanUnscaled = Time.unscaledTime + Mathf.Max(0.05f, _enemyBrainRescanInterval);
-            _enemyBrains = FindObjectsByType<SuperhotEnemyBrain>(FindObjectsInactive.Include, FindObjectsSortMode.InstanceID);
+
+            _enemyBrains = FindEnemyBrainsInLoadedScenes();
             Array.Sort(_enemyBrains, (a, b) => string.CompareOrdinal(a.name, b.name));
+        }
+
+        static SuperhotEnemyBrain[] FindEnemyBrainsInLoadedScenes()
+        {
+            var brains = FindObjectsByType<SuperhotEnemyBrain>(FindObjectsInactive.Include);
+            if (brains.Length > 0)
+                return brains;
+
+            // More reliable for generated prototype scenes where enemies can start inactive.
+            var allBrains = Resources.FindObjectsOfTypeAll<SuperhotEnemyBrain>();
+            var count = 0;
+            for (var i = 0; i < allBrains.Length; i++)
+            {
+                if (IsLoadedSceneObject(allBrains[i]))
+                    count++;
+            }
+
+            if (count == allBrains.Length)
+                return allBrains;
+
+            var filtered = new SuperhotEnemyBrain[count];
+            var next = 0;
+            for (var i = 0; i < allBrains.Length; i++)
+            {
+                var brain = allBrains[i];
+                if (IsLoadedSceneObject(brain))
+                    filtered[next++] = brain;
+            }
+
+            return filtered;
+        }
+
+        static bool IsLoadedSceneObject(Component component)
+        {
+            if (component == null)
+                return false;
+
+            var scene = component.gameObject.scene;
+            return scene.IsValid() && scene.isLoaded && scene != default(Scene);
         }
 
         static void DrawSeparator(string text)
