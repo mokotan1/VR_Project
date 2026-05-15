@@ -389,7 +389,7 @@ namespace VRProject.Presentation.OsFpsInspired
             if (!TryFirstWorldHitExcludingSelf(aimRay, out var hit))
                 return;
 
-            var dmg = hit.collider.GetComponentInParent<OsFpsInspiredDamageable>();
+            var dmg = OsFpsInspiredDamageReceiver.FindInParents(hit.collider);
             if (dmg != null)
                 dmg.ApplyDamage(_damage, hit.point);
         }
