@@ -69,6 +69,17 @@ namespace VRProject.Presentation.OsFpsInspired
         [Tooltip("탄환 프리팹이 눕혀 보이면 각도를 조절합니다. (고급)")]
         [SerializeField] Vector3 _bulletVisualEulerOffset = new Vector3(90f, 0f, 0f);
 
+        [Header("발사 화면 임펄스")]
+        [Tooltip("발사 순간 카메라가 뒤로 튕기는 거리입니다.")]
+        [Range(0f, 0.25f)]
+        [SerializeField] float _fireCameraKickBack = 0.055f;
+        [Tooltip("발사 순간 카메라가 위로 튀는 각도입니다.")]
+        [Range(0f, 12f)]
+        [SerializeField] float _fireCameraPitchKickDegrees = 2.2f;
+        [Tooltip("발사 임펄스가 사라지는 속도입니다.")]
+        [Range(1f, 40f)]
+        [SerializeField] float _fireCameraImpulseReturnSpeed = 18f;
+
         [Header("맞춤 판정 (고급)")]
         [Tooltip("레이가 맞출 레이어. 비어 있지 않게 두는 것이 일반적입니다.")]
         [SerializeField] LayerMask _hitMask = Physics.DefaultRaycastLayers;
@@ -115,6 +126,12 @@ namespace VRProject.Presentation.OsFpsInspired
         Vector3 _handGunBaseLocalPosition;
         Quaternion _handGunBaseLocalRotation;
         bool _hasHandGunBasePose;
+        Transform _cameraImpulseTransform;
+        Vector3 _cameraImpulseBaseLocalPosition;
+        Quaternion _cameraImpulseBaseLocalRotation;
+        Vector3 _cameraImpulseLocalOffset;
+        Quaternion _cameraImpulseLocalRotation = Quaternion.identity;
+        OsFpsInspiredFireCameraImpulse _fireCameraImpulse;
 
         public int AmmoInMag => _ammoInMag;
         public int MagSize => _magSize;
@@ -127,6 +144,8 @@ namespace VRProject.Presentation.OsFpsInspired
         {
             if (_camera == null)
                 _camera = GetComponentInChildren<Camera>();
+            if (_camera != null)
+                BindCameraImpulseTransform(_camera.transform);
             _motor = UnityChanLocomotionMotorResolver.ResolveOn(gameObject);
             _hitscanExclusionRoot = _hitscanExclusionRootOverride != null
                 ? _hitscanExclusionRootOverride
@@ -209,6 +228,7 @@ namespace VRProject.Presentation.OsFpsInspired
 
         void LateUpdate()
         {
+            UpdateCameraImpulse();
             ApplyHandGunViewmodelOffset();
             if (_equipped && _handGunVisual != null && _handGunVisual.activeInHierarchy)
                 PlayerWeaponFirePointForAi.Publish(this, ResolveMuzzleTransform());
@@ -353,6 +373,7 @@ namespace VRProject.Presentation.OsFpsInspired
             _nextFire = Time.unscaledTime + _fireCooldown;
             _ammoInMag--;
             _lastFireUnscaledTime = Time.unscaledTime;
+            AddFireCameraImpulse();
 
             // 총구 forward는 손 본 애니 때문에 아래/옆으로 틀어질 수 있음 → 조준은 항상 카메라 십자(뷰포트 중앙) 방향.
             var aimRay = cam.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0f));
@@ -416,6 +437,55 @@ namespace VRProject.Presentation.OsFpsInspired
                 oneHitOnly: true);
 
             SetEquipped(false);
+        }
+
+        void BindCameraImpulseTransform(Transform cameraTransform)
+        {
+            if (cameraTransform == null || _cameraImpulseTransform == cameraTransform)
+                return;
+
+            _cameraImpulseTransform = cameraTransform;
+            _cameraImpulseBaseLocalPosition = cameraTransform.localPosition;
+            _cameraImpulseBaseLocalRotation = cameraTransform.localRotation;
+            _cameraImpulseLocalOffset = Vector3.zero;
+            _cameraImpulseLocalRotation = Quaternion.identity;
+        }
+
+        void AddFireCameraImpulse()
+        {
+            var cam = _camera != null ? _camera : Camera.main;
+            if (cam == null)
+                return;
+
+            if (_fireCameraImpulse == null)
+                _fireCameraImpulse = cam.GetComponent<OsFpsInspiredFireCameraImpulse>();
+            if (_fireCameraImpulse == null)
+                _fireCameraImpulse = cam.gameObject.AddComponent<OsFpsInspiredFireCameraImpulse>();
+
+            _fireCameraImpulse.AddImpulse(
+                _fireCameraKickBack,
+                _fireCameraPitchKickDegrees,
+                _fireCameraImpulseReturnSpeed);
+
+            BindCameraImpulseTransform(cam.transform);
+            _cameraImpulseLocalOffset += Vector3.back * _fireCameraKickBack;
+            _cameraImpulseLocalRotation = Quaternion.Euler(-_fireCameraPitchKickDegrees, 0f, 0f) * _cameraImpulseLocalRotation;
+        }
+
+        void UpdateCameraImpulse()
+        {
+            if (_fireCameraImpulse != null)
+                return;
+
+            if (_cameraImpulseTransform == null)
+                return;
+
+            var t = 1f - Mathf.Exp(-_fireCameraImpulseReturnSpeed * Time.unscaledDeltaTime);
+            _cameraImpulseLocalOffset = Vector3.Lerp(_cameraImpulseLocalOffset, Vector3.zero, t);
+            _cameraImpulseLocalRotation = Quaternion.Slerp(_cameraImpulseLocalRotation, Quaternion.identity, t);
+
+            _cameraImpulseTransform.localPosition = _cameraImpulseBaseLocalPosition + _cameraImpulseLocalOffset;
+            _cameraImpulseTransform.localRotation = _cameraImpulseBaseLocalRotation * _cameraImpulseLocalRotation;
         }
 
         static void EnsureThrownGunColliders(GameObject root)
