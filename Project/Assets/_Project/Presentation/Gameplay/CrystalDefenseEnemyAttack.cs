@@ -19,6 +19,7 @@ namespace VRProject.Presentation.Gameplay
         [SerializeField] float _cooldownSeconds = 1.1f;
 
         float _nextAttackTime;
+        bool _consumedByCrystalHit;
 
         public float AttackRange => _attackRange;
         public float Damage => _damage;
@@ -32,13 +33,15 @@ namespace VRProject.Presentation.Gameplay
 
         public bool TryAttackCrystal(CrystalCoreHealth crystal, Vector3 hitPoint)
         {
-            if (crystal == null || crystal.IsDestroyed || !IsInRange(crystal.transform))
+            if (_consumedByCrystalHit || crystal == null || crystal.IsDestroyed || !IsInRange(crystal.transform))
                 return false;
             if (Time.time < _nextAttackTime)
                 return false;
 
+            _consumedByCrystalHit = true;
             _nextAttackTime = Time.time + _cooldownSeconds;
             crystal.ApplyDamage(_damage, hitPoint);
+            ConsumeEnemy();
             return true;
         }
 
@@ -52,6 +55,18 @@ namespace VRProject.Presentation.Gameplay
             _nextAttackTime = Time.time + _cooldownSeconds;
             player.ApplyHit();
             return true;
+        }
+
+        void ConsumeEnemy()
+        {
+#if UNITY_EDITOR
+            if (!UnityEngine.Application.isPlaying)
+            {
+                DestroyImmediate(gameObject);
+                return;
+            }
+#endif
+            Destroy(gameObject);
         }
 
 #if UNITY_EDITOR

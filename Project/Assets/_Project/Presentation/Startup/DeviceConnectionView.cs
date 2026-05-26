@@ -39,9 +39,9 @@ namespace VRProject.Presentation.Startup
         protected override void OnInitialize()
         {
             if (_probe == null)
-                _probe = FindFirstObjectByType<DeviceConnectionProbe>();
+                _probe = FindAnyObjectByType<DeviceConnectionProbe>();
             if (_session == null)
-                _session = FindFirstObjectByType<PlayModeSession>();
+                _session = FindAnyObjectByType<PlayModeSession>();
 
             if (_refreshButton != null)
                 _refreshButton.onClick.AddListener(Refresh);

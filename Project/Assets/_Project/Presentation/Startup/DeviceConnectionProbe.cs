@@ -21,16 +21,17 @@ namespace VRProject.Presentation.Startup
 
         public DeviceConnectionStatus Refresh()
         {
-            var isAndroid = Application.platform == RuntimePlatform.Android;
-            var isEditor = Application.isEditor;
+            var platform = UnityEngine.Application.platform;
+            var isAndroid = platform == RuntimePlatform.Android;
+            var isEditor = UnityEngine.Application.isEditor;
             var xrActive = XRSettings.isDeviceActive;
             var xrName = xrActive ? XRSettings.loadedDeviceName : string.Empty;
-            var platformLabel = ResolvePlatformLabel(isAndroid, isEditor);
+            var platformLabel = ResolvePlatformLabel(platform, isAndroid, isEditor);
 
             var mobileAvailable = isAndroid || isEditor ||
-                                  Application.platform == RuntimePlatform.WindowsPlayer ||
-                                  Application.platform == RuntimePlatform.OSXPlayer ||
-                                  Application.platform == RuntimePlatform.LinuxPlayer;
+                                  platform == RuntimePlatform.WindowsPlayer ||
+                                  platform == RuntimePlatform.OSXPlayer ||
+                                  platform == RuntimePlatform.LinuxPlayer;
 
             var vrAvailable = xrActive;
 
@@ -46,13 +47,13 @@ namespace VRProject.Presentation.Startup
             return CurrentStatus;
         }
 
-        static string ResolvePlatformLabel(bool isAndroid, bool isEditor)
+        static string ResolvePlatformLabel(RuntimePlatform platform, bool isAndroid, bool isEditor)
         {
             if (isEditor)
                 return "Unity Editor";
             if (isAndroid)
                 return "Android Device";
-            return Application.platform.ToString();
+            return platform.ToString();
         }
     }
 }

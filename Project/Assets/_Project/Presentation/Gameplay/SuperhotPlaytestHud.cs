@@ -36,7 +36,7 @@ namespace VRProject.Presentation.Gameplay
                 if (_subscribed && _health != null)
                     _health.PlayerDefeated -= OnPlayerDefeated;
 
-                _health = FindFirstObjectByType<SuperhotPlaytestPlayerHealth>();
+                _health = FindAnyObjectByType<SuperhotPlaytestPlayerHealth>();
                 _subscribed = false;
 
                 if (_health != null)

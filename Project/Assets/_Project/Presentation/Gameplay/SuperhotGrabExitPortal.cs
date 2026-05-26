@@ -48,7 +48,7 @@ namespace VRProject.Presentation.Gameplay
             if (_cameraWorldDestination == null)
                 return;
 
-            var flat = FindFirstObjectByType<SuperhotFlatPlaytestRig>(FindObjectsInactive.Exclude);
+            var flat = FindAnyObjectByType<SuperhotFlatPlaytestRig>(FindObjectsInactive.Exclude);
             if (flat != null)
             {
                 flat.TeleportToCameraPose(_cameraWorldDestination);
@@ -58,7 +58,7 @@ namespace VRProject.Presentation.Gameplay
 
             var origin = _xrOrigin;
             if (origin == null || !origin.gameObject.activeInHierarchy)
-                origin = FindFirstObjectByType<XROrigin>(FindObjectsInactive.Exclude);
+                origin = FindAnyObjectByType<XROrigin>(FindObjectsInactive.Exclude);
 
             if (origin == null || !origin.gameObject.activeInHierarchy)
                 return;

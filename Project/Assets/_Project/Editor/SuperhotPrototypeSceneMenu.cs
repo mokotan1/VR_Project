@@ -27,6 +27,7 @@ namespace VRProject.EditorTools
         const string CrystalDefenseScenePath = "Assets/Scenes/CrystalDefensePrototype.unity";
         const string ProjectilePrefabPath = "Assets/_Project/Presentation/Gameplay/Prefabs/SuperhotProjectile.prefab";
         const string CrystalDefenseEnemyPrefabPath = "Assets/_Project/Presentation/Gameplay/Prefabs/CrystalDefenseEnemy.prefab";
+        const string CrystalDefenseEnemyMaterialPath = "Assets/_Project/Materials/CrystalDefenseEnemy.mat";
         const string GlassShardBurstPrefabPath = "Assets/GlassShards/Prefabs/GlassShardBurst.prefab";
         const string XriPackageJsonPath = "Packages/com.unity.xr.interaction.toolkit/package.json";
 
@@ -262,6 +263,40 @@ namespace VRProject.EditorTools
             RunDeferredEditorMenu(CreateCrystalDefensePrototypeSceneDeferred);
         }
 
+        [MenuItem("VR Project/Scenes/Repair Crystal Defense Prototype Assets")]
+        public static void RepairCrystalDefensePrototypeAssets()
+        {
+            EnsureCrystalDefenseEnemyPrefab();
+            AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh();
+            Debug.Log("[VR Project] Repaired Crystal Defense prototype assets.");
+        }
+
+        [MenuItem("VR Project/Scenes/Map Crystal Defense Awareness In Open Scene")]
+        public static void MapCrystalDefenseAwarenessInOpenScene()
+        {
+            var systems = GameObject.Find("Systems");
+            if (systems == null)
+                systems = new GameObject("Systems");
+
+            var hud = systems.GetComponent<CrystalDefenseEnemyAwarenessHud>();
+            if (hud == null)
+                hud = systems.AddComponent<CrystalDefenseEnemyAwarenessHud>();
+
+            var pulse = systems.GetComponent<CrystalThreatPulse>();
+            if (pulse == null)
+                pulse = systems.AddComponent<CrystalThreatPulse>();
+
+            var crystal = UnityEngine.Object.FindAnyObjectByType<CrystalCoreHealth>();
+            var camera = Camera.main ?? UnityEngine.Object.FindAnyObjectByType<Camera>();
+
+            WireAwarenessHud(hud, camera);
+            WireThreatPulse(pulse, crystal);
+
+            EditorSceneManager.MarkSceneDirty(SceneManager.GetActiveScene());
+            Debug.Log("[VR Project] Crystal Defense awareness systems mapped in the open scene.", systems);
+        }
+
         static void CreateCrystalDefensePrototypeSceneDeferred()
         {
             if (!TryEnsureStarterAssetsImported())
@@ -303,9 +338,9 @@ namespace VRProject.EditorTools
             var spawnsParent = new GameObject("EnemySpawns");
             var spawns = new[]
             {
-                CreateSpawnPoint(spawnsParent.transform, "EnemySpawn_01", new Vector3(8f, 0f, 0f)),
-                CreateSpawnPoint(spawnsParent.transform, "EnemySpawn_02", new Vector3(-8f, 0f, 0f)),
-                CreateSpawnPoint(spawnsParent.transform, "EnemySpawn_03", new Vector3(0f, 0f, 8f))
+                CreateSpawnPoint(spawnsParent.transform, "EnemySpawn_01", new Vector3(18f, 0f, 0f)),
+                CreateSpawnPoint(spawnsParent.transform, "EnemySpawn_02", new Vector3(-18f, 0f, 0f)),
+                CreateSpawnPoint(spawnsParent.transform, "EnemySpawn_03", new Vector3(0f, 0f, 18f))
             };
 
             var enemyPrefab = EnsureCrystalDefenseEnemyPrefab();
@@ -323,6 +358,8 @@ namespace VRProject.EditorTools
             var director = systems.AddComponent<CrystalDefenseWaveDirector>();
             var feedback = systems.AddComponent<CrystalDefenseVrFeedback>();
             var binder = systems.AddComponent<CrystalDefenseRuntimeBinder>();
+            var awarenessHud = systems.AddComponent<CrystalDefenseEnemyAwarenessHud>();
+            var threatPulse = systems.AddComponent<CrystalThreatPulse>();
 
             ConfigureWaveDirector(director, crystal, spawns, enemyPrefab);
             WireVrFeedback(feedback, crystal, director);
@@ -331,7 +368,9 @@ namespace VRProject.EditorTools
             BuildCrystalDefenseProps(litShader);
 
             InstantiateXrRigAndWireSystems(scene, systems, rigPrefabPath);
-            BuildFlatPlaytestRig(XrRigSpawnPosition);
+            var flatCamera = BuildFlatPlaytestRig(XrRigSpawnPosition);
+            WireAwarenessHud(awarenessHud, flatCamera);
+            WireThreatPulse(threatPulse, crystal);
 
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene, CrystalDefenseScenePath);
@@ -457,6 +496,26 @@ namespace VRProject.EditorTools
             so.ApplyModifiedPropertiesWithoutUndo();
         }
 
+        static void WireAwarenessHud(CrystalDefenseEnemyAwarenessHud hud, Camera camera)
+        {
+            if (hud == null)
+                return;
+
+            var so = new SerializedObject(hud);
+            so.FindProperty("_camera").objectReferenceValue = camera;
+            so.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        static void WireThreatPulse(CrystalThreatPulse pulse, CrystalCoreHealth crystal)
+        {
+            if (pulse == null)
+                return;
+
+            var so = new SerializedObject(pulse);
+            so.FindProperty("_crystal").objectReferenceValue = crystal;
+            so.ApplyModifiedPropertiesWithoutUndo();
+        }
+
         static void BuildCrystalDefenseProps(Shader litShader)
         {
             var root = new GameObject("ThrowableProps");
@@ -467,6 +526,53 @@ namespace VRProject.EditorTools
             BuildGrabbableCube(root.transform, "Throwable_03", new Vector3(0f, 0.3f, -2f), Vector3.one * 0.3f, kinematic: false, new Color(0.4f, 0.85f, 0.3f));
         }
 
+        static Shader ResolvePrototypeLitShader()
+        {
+            return Shader.Find("Universal Render Pipeline/Lit")
+                ?? Shader.Find("Universal Render Pipeline/Simple Lit")
+                ?? Shader.Find("Universal Render Pipeline/Unlit")
+                ?? Shader.Find("Standard")
+                ?? Shader.Find("Sprites/Default");
+        }
+
+        static Material EnsureMaterialAsset(string path, Color color)
+        {
+            var existing = AssetDatabase.LoadAssetAtPath<Material>(path);
+            if (existing != null)
+            {
+                ApplyMaterialColor(existing, color);
+                EditorUtility.SetDirty(existing);
+                return existing;
+            }
+
+            var dir = System.IO.Path.GetDirectoryName(path);
+            if (!string.IsNullOrEmpty(dir) && !System.IO.Directory.Exists(dir))
+                System.IO.Directory.CreateDirectory(dir);
+
+            var shader = ResolvePrototypeLitShader();
+            if (shader == null)
+                throw new InvalidOperationException("No compatible prototype shader was found for material creation.");
+
+            var material = new Material(shader);
+            ApplyMaterialColor(material, color);
+            AssetDatabase.CreateAsset(material, path);
+            return material;
+        }
+
+        static void ApplyMaterialColor(Material material, Color color)
+        {
+            if (material == null)
+                return;
+
+            material.color = color;
+
+            if (material.HasProperty("_BaseColor"))
+                material.SetColor("_BaseColor", color);
+
+            if (material.HasProperty("_Color"))
+                material.SetColor("_Color", color);
+        }
+
         static GameObject EnsureCrystalDefenseEnemyPrefab()
         {
             var dir = System.IO.Path.GetDirectoryName(CrystalDefenseEnemyPrefabPath);
@@ -475,30 +581,107 @@ namespace VRProject.EditorTools
 
             var existing = AssetDatabase.LoadAssetAtPath<GameObject>(CrystalDefenseEnemyPrefabPath);
             if (existing != null)
+            {
+                RepairCrystalDefenseEnemyPrefab();
                 return existing;
+            }
 
-            var go = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+            var go = new GameObject("CrystalDefenseEnemy");
             go.name = "CrystalDefenseEnemy";
 
             var agent = go.AddComponent<NavMeshAgent>();
-            agent.angularSpeed = 360f;
-            agent.stoppingDistance = 0.3f;
+            ConfigureCrystalDefenseAgent(agent);
+
+            var visual = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+            visual.name = "Visual";
+            visual.transform.SetParent(go.transform, false);
+            visual.transform.localPosition = Vector3.up;
+
+            var visualCollider = visual.GetComponent<CapsuleCollider>();
+            if (visualCollider != null)
+                visualCollider.enabled = true;
+
+            var material = EnsureMaterialAsset(CrystalDefenseEnemyMaterialPath, new Color(0.85f, 0.15f, 0.12f));
+            visual.GetComponent<MeshRenderer>().sharedMaterial = material;
 
             go.AddComponent<SuperhotEnemyBrain>();
             go.AddComponent<CrystalDefenseEnemyObjective>();
             go.AddComponent<CrystalDefenseEnemyAttack>();
             go.AddComponent<OsFpsInspiredDamageable>();
 
-            var shader = Shader.Find("Universal Render Pipeline/Lit");
-            if (shader != null)
-            {
-                var mat = new Material(shader) { color = new Color(0.85f, 0.15f, 0.12f) };
-                go.GetComponent<MeshRenderer>().sharedMaterial = mat;
-            }
-
             var prefab = PrefabUtility.SaveAsPrefabAsset(go, CrystalDefenseEnemyPrefabPath);
             UnityEngine.Object.DestroyImmediate(go);
             return prefab;
+        }
+
+        static void ConfigureCrystalDefenseAgent(NavMeshAgent agent)
+        {
+            if (agent == null)
+                return;
+
+            agent.angularSpeed = 360f;
+            agent.stoppingDistance = 0.3f;
+            agent.height = 2f;
+            agent.baseOffset = 1f;
+        }
+
+        static void RepairCrystalDefenseEnemyPrefab()
+        {
+            var root = PrefabUtility.LoadPrefabContents(CrystalDefenseEnemyPrefabPath);
+            try
+            {
+                var material = EnsureMaterialAsset(CrystalDefenseEnemyMaterialPath, new Color(0.85f, 0.15f, 0.12f));
+                var rootRenderer = root.GetComponent<MeshRenderer>();
+                if (rootRenderer != null)
+                    rootRenderer.enabled = false;
+
+                var rootCollider = root.GetComponent<Collider>();
+                if (rootCollider != null)
+                    rootCollider.enabled = false;
+
+                var visual = root.transform.Find("Visual");
+                if (visual == null)
+                {
+                    var visualGo = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+                    visualGo.name = "Visual";
+                    visualGo.transform.SetParent(root.transform, false);
+                    visual = visualGo.transform;
+                }
+
+                visual.localPosition = Vector3.up;
+                visual.localRotation = Quaternion.identity;
+                visual.localScale = Vector3.one;
+
+                var renderer = visual.GetComponent<MeshRenderer>();
+                if (renderer != null)
+                {
+                    renderer.enabled = true;
+                    renderer.sharedMaterial = material;
+                }
+
+                var collider = visual.GetComponent<CapsuleCollider>();
+                if (collider != null)
+                    collider.enabled = true;
+
+                var agent = root.GetComponent<NavMeshAgent>();
+                if (agent == null)
+                    agent = root.AddComponent<NavMeshAgent>();
+                ConfigureCrystalDefenseAgent(agent);
+                if (root.GetComponent<SuperhotEnemyBrain>() == null)
+                    root.AddComponent<SuperhotEnemyBrain>();
+                if (root.GetComponent<CrystalDefenseEnemyObjective>() == null)
+                    root.AddComponent<CrystalDefenseEnemyObjective>();
+                if (root.GetComponent<CrystalDefenseEnemyAttack>() == null)
+                    root.AddComponent<CrystalDefenseEnemyAttack>();
+                if (root.GetComponent<OsFpsInspiredDamageable>() == null)
+                    root.AddComponent<OsFpsInspiredDamageable>();
+
+                PrefabUtility.SaveAsPrefabAsset(root, CrystalDefenseEnemyPrefabPath);
+            }
+            finally
+            {
+                PrefabUtility.UnloadPrefabContents(root);
+            }
         }
 
         static void RunDeferredEditorMenu(Action action)
@@ -546,7 +729,7 @@ namespace VRProject.EditorTools
             return SuperhotXrRigPrefabPathSelector.SelectPreferredPath(paths);
         }
 
-        static void BuildFlatPlaytestRig(Vector3 worldPosition)
+        static Camera BuildFlatPlaytestRig(Vector3 worldPosition)
         {
             var root = new GameObject("Flat Playtest Rig");
             root.transform.SetPositionAndRotation(worldPosition, Quaternion.identity);
@@ -586,6 +769,8 @@ namespace VRProject.EditorTools
             var weaponSo = new SerializedObject(weapon);
             weaponSo.FindProperty("_camera").objectReferenceValue = cam;
             weaponSo.ApplyModifiedPropertiesWithoutUndo();
+
+            return cam;
         }
 
         static GameObject InstantiateXrRigAndWireSystems(Scene scene, GameObject systems, string prefabPath)

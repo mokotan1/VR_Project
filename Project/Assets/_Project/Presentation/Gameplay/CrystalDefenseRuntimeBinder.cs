@@ -20,9 +20,9 @@ namespace VRProject.Presentation.Gameplay
         void Awake()
         {
             if (_crystal == null)
-                _crystal = FindFirstObjectByType<CrystalCoreHealth>();
+                _crystal = FindAnyObjectByType<CrystalCoreHealth>();
             if (_director == null)
-                _director = FindFirstObjectByType<CrystalDefenseWaveDirector>();
+                _director = FindAnyObjectByType<CrystalDefenseWaveDirector>();
 
             BindExistingEnemies();
         }

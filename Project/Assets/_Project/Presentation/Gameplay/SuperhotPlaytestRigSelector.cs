@@ -41,8 +41,8 @@ namespace VRProject.Presentation.Gameplay
 
         void ApplyRigSelection(bool useXr)
         {
-            var xrOrigin = FindFirstObjectByType<XROrigin>(FindObjectsInactive.Include);
-            var flatRig = FindFirstObjectByType<SuperhotFlatPlaytestRig>(FindObjectsInactive.Include);
+            var xrOrigin = FindAnyObjectByType<XROrigin>(FindObjectsInactive.Include);
+            var flatRig = FindAnyObjectByType<SuperhotFlatPlaytestRig>(FindObjectsInactive.Include);
 
             if (xrOrigin != null)
                 xrOrigin.gameObject.SetActive(useXr);

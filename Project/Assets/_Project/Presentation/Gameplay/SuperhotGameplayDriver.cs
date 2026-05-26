@@ -356,10 +356,10 @@ namespace VRProject.Presentation.Gameplay
         void DriveFlatPlaytest(float unscaledDt)
         {
             if (_flatFps == null || !_flatFps.isActiveAndEnabled)
-                _flatFps = FindFirstObjectByType<SuperhotFlatFpsController>(FindObjectsInactive.Include);
+                _flatFps = FindAnyObjectByType<SuperhotFlatFpsController>(FindObjectsInactive.Include);
 
             if (_flatHitscanWeapon == null || !_flatHitscanWeapon.isActiveAndEnabled)
-                _flatHitscanWeapon = FindFirstObjectByType<SuperhotFlatHitscanWeapon>(FindObjectsInactive.Include);
+                _flatHitscanWeapon = FindAnyObjectByType<SuperhotFlatHitscanWeapon>(FindObjectsInactive.Include);
 
             if (_flatUseDesktopInputModel)
             {
@@ -370,7 +370,7 @@ namespace VRProject.Presentation.Gameplay
                 }
 
                 if (_osFpsMotor == null || !_osFpsMotor.isActiveAndEnabled)
-                    _osFpsMotor = FindFirstObjectByType<OsFpsInspiredPlayerMotor>(FindObjectsInactive.Include);
+                    _osFpsMotor = FindAnyObjectByType<OsFpsInspiredPlayerMotor>(FindObjectsInactive.Include);
 
                 if (_osFpsMotor == null)
                 {
@@ -415,7 +415,7 @@ namespace VRProject.Presentation.Gameplay
             else
             {
                 if (_osFpsMotor == null || !_osFpsMotor.isActiveAndEnabled)
-                    _osFpsMotor = FindFirstObjectByType<OsFpsInspiredPlayerMotor>(FindObjectsInactive.Include);
+                    _osFpsMotor = FindAnyObjectByType<OsFpsInspiredPlayerMotor>(FindObjectsInactive.Include);
 
                 if (_osFpsMotor == null)
                 {

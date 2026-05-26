@@ -91,10 +91,16 @@ namespace VRProject.Presentation.Gameplay
             _agent.nextPosition = transform.position;
 
             var dt = _clock != null ? _clock.SimulationDeltaTime : Time.deltaTime;
+            var playerVisible = HasLOS();
+
+            if (TryTickCrystalDefense(dt, playerVisible))
+                return;
 
             switch (_state)
             {
                 case EnemyState.Idle:
+                    if (playerVisible)
+                        SetState(EnemyState.Engaging);
                     break;
                 case EnemyState.Investigating:
                     Tick_Investigating();
@@ -109,6 +115,26 @@ namespace VRProject.Presentation.Gameplay
                     Tick_CloseRange(dt);
                     break;
             }
+        }
+
+        bool TryTickCrystalDefense(float dt, bool playerVisible)
+        {
+            if (_defenseObjective == null || _defenseAttack == null)
+                return false;
+
+            var targetKind = _defenseObjective.RefreshTarget(playerVisible);
+            if (targetKind != CrystalDefenseTargetKind.Crystal)
+                return false;
+
+            var crystal = _defenseObjective.Crystal;
+            if (crystal == null)
+                return false;
+
+            TrySetDestination(crystal.transform.position);
+            MoveAlongPath(dt, _closeSpeed);
+            FaceTarget(crystal.transform);
+            _defenseAttack.TryAttackCrystal(crystal, transform.position + Vector3.up);
+            return true;
         }
 
         void OnSoundHeard(SuperhotSoundEvent e)
