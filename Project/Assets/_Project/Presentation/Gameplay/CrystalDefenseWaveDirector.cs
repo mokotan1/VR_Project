@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using VRProject.Presentation.OsFpsInspired;
 
 namespace VRProject.Presentation.Gameplay
 {
@@ -117,6 +118,8 @@ namespace VRProject.Presentation.Gameplay
                 MarkWon();
         }
 
+        const float BossScaleMultiplier = 1.25f;
+
         void SpawnEnemy(CrystalDefenseWaveDefinition wave, int spawnIndex)
         {
             if (wave.EnemyPrefab == null || _spawnPoints == null || _spawnPoints.Length == 0)
@@ -132,6 +135,18 @@ namespace VRProject.Presentation.Gameplay
             var objective = enemy.GetComponent<CrystalDefenseEnemyObjective>();
             if (objective != null)
                 objective.Crystal = _crystal;
+
+            if (wave.IsBossWave)
+                ApplyBossModifiers(enemy);
+        }
+
+        static void ApplyBossModifiers(GameObject enemy)
+        {
+            enemy.name = "Boss_" + enemy.name;
+            enemy.transform.localScale *= BossScaleMultiplier;
+
+            if (enemy.GetComponent<OsFpsInspiredDamageable>() == null)
+                enemy.AddComponent<OsFpsInspiredDamageable>();
         }
 
         void PruneAlive()
