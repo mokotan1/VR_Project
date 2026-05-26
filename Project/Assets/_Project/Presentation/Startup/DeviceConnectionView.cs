@@ -86,11 +86,18 @@ namespace VRProject.Presentation.Startup
                 _vrPlayButton.interactable = PlayModeSelection.CanSelect(PlayModeKind.Vr, status.Availability);
 
             if (_messageText != null)
-            {
-                _messageText.text = status.Availability.VrAvailable
-                    ? "VR device is connected. Choose a play mode."
-                    : "No VR headset detected. Mobile Play is available on this device.";
-            }
+                _messageText.text = ResolveMessage(status.Availability);
+        }
+
+        static string ResolveMessage(PlayModeAvailability availability)
+        {
+            if (availability.VrAvailable && availability.MobileAvailable)
+                return "Both play modes are available. Choose how you want to play.";
+            if (availability.MobileAvailable)
+                return "Mobile Play is available. Connect a VR headset and press Refresh to enable VR Play.";
+            if (availability.VrAvailable)
+                return "VR Play is available. Mobile Play is unavailable on this platform.";
+            return "No playable mode is available. Check the connected device and press Refresh.";
         }
 
         void SelectMode(PlayModeKind requestedMode)
