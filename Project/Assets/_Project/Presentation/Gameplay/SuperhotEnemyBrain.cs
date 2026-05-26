@@ -46,6 +46,9 @@ namespace VRProject.Presentation.Gameplay
         float _flankSearchCooldown;
         Vector3? _cachedFlankCorner;
 
+        CrystalDefenseEnemyObjective _defenseObjective;
+        CrystalDefenseEnemyAttack _defenseAttack;
+
         void Awake()
         {
             _agent = GetComponent<NavMeshAgent>();
@@ -55,6 +58,9 @@ namespace VRProject.Presentation.Gameplay
             _legacyMover = GetComponent<SuperhotEnemyMover>();
             if (_legacyMover != null)
                 _legacyMover.enabled = false;
+
+            _defenseObjective = GetComponent<CrystalDefenseEnemyObjective>();
+            _defenseAttack = GetComponent<CrystalDefenseEnemyAttack>();
         }
 
         void OnEnable()
@@ -172,6 +178,23 @@ namespace VRProject.Presentation.Gameplay
 
             _losLostTimer = 0f;
 
+            if (_defenseObjective != null && _defenseAttack != null)
+            {
+                var targetKind = _defenseObjective.RefreshTarget(playerVisible: true);
+                if (targetKind == CrystalDefenseTargetKind.Crystal)
+                {
+                    var crystal = _defenseObjective.Crystal;
+                    if (crystal != null)
+                    {
+                        _agent.SetDestination(crystal.transform.position);
+                        MoveAlongPath(dt, _closeSpeed);
+                        FaceTarget(crystal.transform);
+                        _defenseAttack.TryAttackCrystal(crystal, transform.position + Vector3.up);
+                        return;
+                    }
+                }
+            }
+
             var strafeDir = ComputeStrafeDir();
             if (strafeDir.sqrMagnitude > 1e-4f)
             {
@@ -211,10 +234,15 @@ namespace VRProject.Presentation.Gameplay
 
         void FacePlayer()
         {
-            if (_playerTransform == null)
+            FaceTarget(_playerTransform);
+        }
+
+        void FaceTarget(Transform target)
+        {
+            if (target == null)
                 return;
 
-            var dir = _playerTransform.position - transform.position;
+            var dir = target.position - transform.position;
             dir.y = 0f;
             if (dir.sqrMagnitude > 1e-4f)
                 transform.rotation = Quaternion.LookRotation(dir);
