@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Unity.AI.Navigation;
 using Unity.XR.CoreUtils;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -294,6 +295,7 @@ namespace VRProject.EditorTools
             floor.name = "Floor";
             floor.transform.localScale = new Vector3(8f, 1f, 8f);
             floor.AddComponent<TeleportationArea>();
+            BakeNavMeshForFloor(floor);
 
             var litShader = Shader.Find("Universal Render Pipeline/Lit");
 
@@ -337,8 +339,32 @@ namespace VRProject.EditorTools
             AddSceneToBuildSettingsIfNeeded(CrystalDefenseScenePath);
 
             Debug.Log(
-                $"[VR Project] Saved {CrystalDefenseScenePath}. Bake a NavMesh (Window → AI → Navigation) before play. " +
+                $"[VR Project] Saved {CrystalDefenseScenePath}. NavMesh was auto-baked on Floor (NavMeshSurface). " +
                 "Three normal waves + one boss wave are wired. Assign a different enemy prefab on the WaveDirector if desired.");
+        }
+
+        static void BakeNavMeshForFloor(GameObject floor)
+        {
+            if (floor == null)
+                return;
+
+            var surface = floor.AddComponent<NavMeshSurface>();
+            surface.collectObjects = CollectObjects.All;
+            surface.layerMask = ~0;
+            surface.useGeometry = NavMeshCollectGeometry.PhysicsColliders;
+
+            try
+            {
+                surface.BuildNavMesh();
+                Debug.Log("[VR Project] CrystalDefensePrototype: NavMeshSurface bake completed.", surface);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning(
+                    "[VR Project] CrystalDefensePrototype: NavMeshSurface bake failed. " +
+                    "Bake manually via Window → AI → Navigation → Bake. Reason: " + ex.Message,
+                    surface);
+            }
         }
 
         static CrystalCoreHealth BuildCrystalCore(Shader litShader)
