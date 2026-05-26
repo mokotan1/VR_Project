@@ -15,6 +15,7 @@ using UnityEngine.UI;
 using VRProject.Application.Gameplay;
 using VRProject.Presentation.Common.Managers;
 using VRProject.Presentation.Gameplay;
+using VRProject.Presentation.OsFpsInspired;
 
 namespace VRProject.EditorTools
 {
@@ -22,7 +23,9 @@ namespace VRProject.EditorTools
     {
         const string ScenePath = "Assets/Scenes/SuperhotPrototype.unity";
         const string PlayerInteractionTestScenePath = "Assets/Scenes/PlayerInteractionTest.unity";
+        const string CrystalDefenseScenePath = "Assets/Scenes/CrystalDefensePrototype.unity";
         const string ProjectilePrefabPath = "Assets/_Project/Presentation/Gameplay/Prefabs/SuperhotProjectile.prefab";
+        const string CrystalDefenseEnemyPrefabPath = "Assets/_Project/Presentation/Gameplay/Prefabs/CrystalDefenseEnemy.prefab";
         const string GlassShardBurstPrefabPath = "Assets/GlassShards/Prefabs/GlassShardBurst.prefab";
         const string XriPackageJsonPath = "Packages/com.unity.xr.interaction.toolkit/package.json";
 
@@ -250,6 +253,226 @@ namespace VRProject.EditorTools
                 var m = new Material(litShader) { color = new Color(0.85f, 0.15f, 0.12f) };
                 cap.GetComponent<MeshRenderer>().sharedMaterial = m;
             }
+        }
+
+        [MenuItem("VR Project/Scenes/Create Crystal Defense Prototype Scene")]
+        public static void CreateCrystalDefensePrototypeScene()
+        {
+            RunDeferredEditorMenu(CreateCrystalDefensePrototypeSceneDeferred);
+        }
+
+        static void CreateCrystalDefensePrototypeSceneDeferred()
+        {
+            if (!TryEnsureStarterAssetsImported())
+            {
+                EditorUtility.DisplayDialog(
+                    "Crystal Defense Prototype",
+                    "XR Interaction Toolkit Starter Assets could not be imported or the VR rig prefab is still missing. " +
+                    "Open Window → Package Manager → XR Interaction Toolkit → Samples → import \"Starter Assets\", then run this menu again.",
+                    "OK");
+                return;
+            }
+
+            var rigPrefabPath = ResolveXrRigPrefabAssetPath();
+            if (string.IsNullOrEmpty(rigPrefabPath))
+            {
+                EditorUtility.DisplayDialog(
+                    "Crystal Defense Prototype",
+                    "Could not locate \"XR Origin (XR Rig).prefab\" under Starter Assets.",
+                    "OK");
+                return;
+            }
+
+            var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+
+            var lightGo = new GameObject("Directional Light");
+            var light = lightGo.AddComponent<Light>();
+            light.type = LightType.Directional;
+            lightGo.transform.rotation = Quaternion.Euler(50f, -30f, 0f);
+
+            var floor = GameObject.CreatePrimitive(PrimitiveType.Plane);
+            floor.name = "Floor";
+            floor.transform.localScale = new Vector3(8f, 1f, 8f);
+            floor.AddComponent<TeleportationArea>();
+
+            var litShader = Shader.Find("Universal Render Pipeline/Lit");
+
+            var crystal = BuildCrystalCore(litShader);
+            var spawnsParent = new GameObject("EnemySpawns");
+            var spawns = new[]
+            {
+                CreateSpawnPoint(spawnsParent.transform, "EnemySpawn_01", new Vector3(8f, 0f, 0f)),
+                CreateSpawnPoint(spawnsParent.transform, "EnemySpawn_02", new Vector3(-8f, 0f, 0f)),
+                CreateSpawnPoint(spawnsParent.transform, "EnemySpawn_03", new Vector3(0f, 0f, 8f))
+            };
+
+            var enemyPrefab = EnsureCrystalDefenseEnemyPrefab();
+            if (enemyPrefab == null)
+            {
+                Debug.LogWarning(
+                    "[VR Project] Crystal Defense enemy prefab missing; assign WaveDirector._waves[i].EnemyPrefab manually.");
+            }
+
+            var systems = new GameObject("Systems");
+            systems.AddComponent<GameBootstrapper>();
+            systems.AddComponent<XRInteractionManager>();
+            systems.AddComponent<SuperhotGameplayDriver>();
+            systems.AddComponent<SuperhotPlaytestRigSelector>();
+            var director = systems.AddComponent<CrystalDefenseWaveDirector>();
+            var feedback = systems.AddComponent<CrystalDefenseVrFeedback>();
+            var binder = systems.AddComponent<CrystalDefenseRuntimeBinder>();
+
+            ConfigureWaveDirector(director, crystal, spawns, enemyPrefab);
+            WireVrFeedback(feedback, crystal, director);
+            WireRuntimeBinder(binder, crystal, director);
+
+            BuildCrystalDefenseProps(litShader);
+
+            InstantiateXrRigAndWireSystems(scene, systems, rigPrefabPath);
+            BuildFlatPlaytestRig(XrRigSpawnPosition);
+
+            EditorSceneManager.MarkSceneDirty(scene);
+            EditorSceneManager.SaveScene(scene, CrystalDefenseScenePath);
+            AssetDatabase.Refresh();
+            AddSceneToBuildSettingsIfNeeded(CrystalDefenseScenePath);
+
+            Debug.Log(
+                $"[VR Project] Saved {CrystalDefenseScenePath}. Bake a NavMesh (Window → AI → Navigation) before play. " +
+                "Three normal waves + one boss wave are wired. Assign a different enemy prefab on the WaveDirector if desired.");
+        }
+
+        static CrystalCoreHealth BuildCrystalCore(Shader litShader)
+        {
+            var root = new GameObject("Crystal_Core");
+            root.transform.position = new Vector3(0f, 0.5f, 0f);
+
+            var mesh = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            mesh.name = "Mesh";
+            mesh.transform.SetParent(root.transform, false);
+            mesh.transform.localScale = Vector3.one * 1.2f;
+
+            if (litShader != null)
+            {
+                var m = new Material(litShader) { color = new Color(0.4f, 0.8f, 0.95f) };
+                mesh.GetComponent<MeshRenderer>().sharedMaterial = m;
+            }
+
+            return root.AddComponent<CrystalCoreHealth>();
+        }
+
+        static Transform CreateSpawnPoint(Transform parent, string name, Vector3 worldPosition)
+        {
+            var go = new GameObject(name);
+            go.transform.SetParent(parent, false);
+            go.transform.position = worldPosition;
+            return go.transform;
+        }
+
+        static void ConfigureWaveDirector(
+            CrystalDefenseWaveDirector director,
+            CrystalCoreHealth crystal,
+            Transform[] spawns,
+            GameObject enemyPrefab)
+        {
+            var so = new SerializedObject(director);
+            so.FindProperty("_crystal").objectReferenceValue = crystal;
+
+            var spawnsProp = so.FindProperty("_spawnPoints");
+            spawnsProp.arraySize = spawns.Length;
+            for (var i = 0; i < spawns.Length; i++)
+                spawnsProp.GetArrayElementAtIndex(i).objectReferenceValue = spawns[i];
+
+            var wavesProp = so.FindProperty("_waves");
+            wavesProp.arraySize = 4;
+            SetWaveValues(wavesProp.GetArrayElementAtIndex(0), enemyPrefab, count: 3, interval: 1f, maxAlive: 2, startDelay: 3f, isBoss: false);
+            SetWaveValues(wavesProp.GetArrayElementAtIndex(1), enemyPrefab, count: 4, interval: 0.9f, maxAlive: 3, startDelay: 5f, isBoss: false);
+            SetWaveValues(wavesProp.GetArrayElementAtIndex(2), enemyPrefab, count: 5, interval: 0.8f, maxAlive: 3, startDelay: 5f, isBoss: false);
+            SetWaveValues(wavesProp.GetArrayElementAtIndex(3), enemyPrefab, count: 1, interval: 0.5f, maxAlive: 1, startDelay: 4f, isBoss: true);
+
+            so.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        static void SetWaveValues(
+            SerializedProperty waveProp,
+            GameObject enemyPrefab,
+            int count,
+            float interval,
+            int maxAlive,
+            float startDelay,
+            bool isBoss)
+        {
+            waveProp.FindPropertyRelative("EnemyPrefab").objectReferenceValue = enemyPrefab;
+            waveProp.FindPropertyRelative("EnemyCount").intValue = count;
+            waveProp.FindPropertyRelative("SpawnIntervalSeconds").floatValue = interval;
+            waveProp.FindPropertyRelative("MaxAlive").intValue = maxAlive;
+            waveProp.FindPropertyRelative("StartDelaySeconds").floatValue = startDelay;
+            waveProp.FindPropertyRelative("IsBossWave").boolValue = isBoss;
+        }
+
+        static void WireVrFeedback(
+            CrystalDefenseVrFeedback feedback,
+            CrystalCoreHealth crystal,
+            CrystalDefenseWaveDirector director)
+        {
+            var so = new SerializedObject(feedback);
+            so.FindProperty("_crystal").objectReferenceValue = crystal;
+            so.FindProperty("_waveDirector").objectReferenceValue = director;
+            so.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        static void WireRuntimeBinder(
+            CrystalDefenseRuntimeBinder binder,
+            CrystalCoreHealth crystal,
+            CrystalDefenseWaveDirector director)
+        {
+            var so = new SerializedObject(binder);
+            so.FindProperty("_crystal").objectReferenceValue = crystal;
+            so.FindProperty("_director").objectReferenceValue = director;
+            so.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        static void BuildCrystalDefenseProps(Shader litShader)
+        {
+            var root = new GameObject("ThrowableProps");
+            root.transform.position = Vector3.zero;
+
+            BuildGrabbableCube(root.transform, "Throwable_01", new Vector3(2f, 0.3f, 1f), Vector3.one * 0.3f, kinematic: false, new Color(0.2f, 0.75f, 0.9f));
+            BuildGrabbableCube(root.transform, "Throwable_02", new Vector3(-2f, 0.3f, 1f), Vector3.one * 0.3f, kinematic: false, new Color(0.9f, 0.4f, 0.2f));
+            BuildGrabbableCube(root.transform, "Throwable_03", new Vector3(0f, 0.3f, -2f), Vector3.one * 0.3f, kinematic: false, new Color(0.4f, 0.85f, 0.3f));
+        }
+
+        static GameObject EnsureCrystalDefenseEnemyPrefab()
+        {
+            var dir = System.IO.Path.GetDirectoryName(CrystalDefenseEnemyPrefabPath);
+            if (!string.IsNullOrEmpty(dir) && !System.IO.Directory.Exists(dir))
+                System.IO.Directory.CreateDirectory(dir);
+
+            var existing = AssetDatabase.LoadAssetAtPath<GameObject>(CrystalDefenseEnemyPrefabPath);
+            if (existing != null)
+                return existing;
+
+            var go = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+            go.name = "CrystalDefenseEnemy";
+
+            var agent = go.AddComponent<NavMeshAgent>();
+            agent.angularSpeed = 360f;
+            agent.stoppingDistance = 0.3f;
+
+            go.AddComponent<SuperhotEnemyBrain>();
+            go.AddComponent<CrystalDefenseEnemyObjective>();
+            go.AddComponent<CrystalDefenseEnemyAttack>();
+            go.AddComponent<OsFpsInspiredDamageable>();
+
+            var shader = Shader.Find("Universal Render Pipeline/Lit");
+            if (shader != null)
+            {
+                var mat = new Material(shader) { color = new Color(0.85f, 0.15f, 0.12f) };
+                go.GetComponent<MeshRenderer>().sharedMaterial = mat;
+            }
+
+            var prefab = PrefabUtility.SaveAsPrefabAsset(go, CrystalDefenseEnemyPrefabPath);
+            UnityEngine.Object.DestroyImmediate(go);
+            return prefab;
         }
 
         static void RunDeferredEditorMenu(Action action)
