@@ -227,6 +227,9 @@ namespace VRProject.EditorTools
 
             cube.AddComponent<XRGrabInteractable>();
 
+            if (!kinematic)
+                cube.AddComponent<CrystalDefenseGrabbableDamage>();
+
             var shader = Shader.Find("Universal Render Pipeline/Lit");
             if (shader != null)
             {
