@@ -59,5 +59,13 @@ namespace VRProject.Tests.EditMode
 
             Assert.IsTrue(normalized.IsBossWave);
         }
+
+        [Test]
+        public void IsWaveClear_WhenAllSpawnedAndNoAlive_ReturnsTrue()
+        {
+            Assert.IsFalse(CrystalDefenseWaveDirector.IsWaveClear(2, 3, 0));
+            Assert.IsFalse(CrystalDefenseWaveDirector.IsWaveClear(3, 3, 1));
+            Assert.IsTrue(CrystalDefenseWaveDirector.IsWaveClear(3, 3, 0));
+        }
     }
 }
