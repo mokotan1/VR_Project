@@ -49,6 +49,9 @@ namespace VRProject.Presentation.Gameplay
         CrystalDefenseEnemyObjective _defenseObjective;
         CrystalDefenseEnemyAttack _defenseAttack;
 
+        bool _navWarningLogged;
+        const float NavMeshSampleRadius = 5f;
+
         void Awake()
         {
             _agent = GetComponent<NavMeshAgent>();
@@ -61,6 +64,11 @@ namespace VRProject.Presentation.Gameplay
 
             _defenseObjective = GetComponent<CrystalDefenseEnemyObjective>();
             _defenseAttack = GetComponent<CrystalDefenseEnemyAttack>();
+        }
+
+        void Start()
+        {
+            TryPlaceOnNavMesh();
         }
 
         void OnEnable()
@@ -136,13 +144,13 @@ namespace VRProject.Presentation.Gameplay
             var corner = FindFlankCorner();
             if (corner.HasValue)
             {
-                _agent.SetDestination(corner.Value);
-                SetState(EnemyState.FlankToCorner);
+                if (TrySetDestination(corner.Value))
+                    SetState(EnemyState.FlankToCorner);
             }
             else
             {
-                _agent.SetDestination(_lastSoundOrigin);
-                SetState(EnemyState.Engaging);
+                if (TrySetDestination(_lastSoundOrigin))
+                    SetState(EnemyState.Engaging);
             }
         }
 
@@ -186,7 +194,7 @@ namespace VRProject.Presentation.Gameplay
                     var crystal = _defenseObjective.Crystal;
                     if (crystal != null)
                     {
-                        _agent.SetDestination(crystal.transform.position);
+                        TrySetDestination(crystal.transform.position);
                         MoveAlongPath(dt, _closeSpeed);
                         FaceTarget(crystal.transform);
                         _defenseAttack.TryAttackCrystal(crystal, transform.position + Vector3.up);
@@ -200,7 +208,7 @@ namespace VRProject.Presentation.Gameplay
             {
                 var targetPos = transform.position + strafeDir * (_strafeSpeed * dt * 5f);
                 if (NavMesh.SamplePosition(targetPos, out var hit, 1f, NavMesh.AllAreas))
-                    _agent.SetDestination(hit.position);
+                    TrySetDestination(hit.position);
             }
 
             MoveAlongPath(dt, _strafeSpeed);
@@ -215,13 +223,16 @@ namespace VRProject.Presentation.Gameplay
                 return;
             }
 
-            _agent.SetDestination(_playerTransform.position);
+            TrySetDestination(_playerTransform.position);
             MoveAlongPath(dt, _closeSpeed);
             FacePlayer();
         }
 
         void MoveAlongPath(float dt, float speed)
         {
+            if (_agent == null || !_agent.isOnNavMesh)
+                return;
+
             if (_agent.pathPending || !_agent.hasPath || _agent.remainingDistance < 0.05f)
                 return;
 
@@ -230,6 +241,47 @@ namespace VRProject.Presentation.Gameplay
                 return;
 
             transform.position += desiredVel.normalized * (speed * dt);
+        }
+
+        bool TrySetDestination(Vector3 destination)
+        {
+            if (_agent == null || !_agent.isActiveAndEnabled)
+                return false;
+
+            if (!_agent.isOnNavMesh && !TryPlaceOnNavMesh())
+            {
+                WarnNavMeshMissingOnce();
+                return false;
+            }
+
+            return _agent.SetDestination(destination);
+        }
+
+        bool TryPlaceOnNavMesh()
+        {
+            if (_agent == null || !_agent.isActiveAndEnabled)
+                return false;
+
+            if (_agent.isOnNavMesh)
+                return true;
+
+            if (NavMesh.SamplePosition(transform.position, out var hit, NavMeshSampleRadius, NavMesh.AllAreas))
+                return _agent.Warp(hit.position);
+
+            return false;
+        }
+
+        void WarnNavMeshMissingOnce()
+        {
+            if (_navWarningLogged)
+                return;
+
+            _navWarningLogged = true;
+            Debug.LogWarning(
+                $"[SuperhotEnemyBrain] '{name}' is not on a baked NavMesh (sample radius {NavMeshSampleRadius}m). " +
+                "AI movement disabled until a NavMesh is baked for this scene. " +
+                "(Window → AI → Navigation → Bake, or add a NavMeshSurface component.)",
+                this);
         }
 
         void FacePlayer()
