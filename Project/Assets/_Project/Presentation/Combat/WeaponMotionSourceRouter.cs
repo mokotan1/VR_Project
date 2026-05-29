@@ -18,11 +18,14 @@ namespace VRProject.Presentation.Combat
         [SerializeField] MobileTouchWeaponMotionSource _mobileSource;
 
         IWeaponMotionSource _activeSource;
+        Rigidbody _body;
 
         public IWeaponMotionSource ActiveSource => _activeSource;
 
         void Awake()
         {
+            _body = GetComponent<Rigidbody>();
+            EnsureSolidColliderForPhysicsBody();
             if (_vrSource == null)
                 _vrSource = GetComponent<VrGrabbedWeaponMotionSource>();
             if (_flatSource == null)
@@ -31,6 +34,23 @@ namespace VRProject.Presentation.Combat
                 _mobileSource = GetComponent<MobileTouchWeaponMotionSource>();
 
             SelectSource();
+        }
+
+        void EnsureSolidColliderForPhysicsBody()
+        {
+            if (_body == null)
+                return;
+
+            foreach (var collider in GetComponentsInChildren<Collider>(true))
+            {
+                if (collider != null && !collider.isTrigger)
+                    return;
+            }
+
+            var box = gameObject.AddComponent<BoxCollider>();
+            box.isTrigger = false;
+            box.size = new Vector3(0.26f, 0.14f, 0.92f);
+            box.center = new Vector3(0f, 0f, 0.32f);
         }
 
         void SelectSource()
@@ -46,6 +66,7 @@ namespace VRProject.Presentation.Combat
             {
                 SetActive(_vrSource, true);
                 _activeSource = _vrSource;
+                ConfigureBodyForHeldFlatOrMobile(false);
                 return;
             }
 
@@ -53,17 +74,33 @@ namespace VRProject.Presentation.Combat
             {
                 SetActive(_mobileSource, true);
                 _activeSource = _mobileSource;
+                ConfigureBodyForHeldFlatOrMobile(true);
                 return;
             }
 
             SetActive(_flatSource, true);
             _activeSource = _flatSource;
+            ConfigureBodyForHeldFlatOrMobile(true);
         }
 
         static void SetActive(MonoBehaviour source, bool active)
         {
             if (source != null)
                 source.enabled = active;
+        }
+
+        void ConfigureBodyForHeldFlatOrMobile(bool held)
+        {
+            if (_body == null)
+                return;
+
+            _body.isKinematic = held;
+            _body.useGravity = !held;
+            if (held)
+            {
+                _body.linearVelocity = Vector3.zero;
+                _body.angularVelocity = Vector3.zero;
+            }
         }
     }
 }

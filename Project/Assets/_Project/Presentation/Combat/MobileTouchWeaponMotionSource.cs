@@ -69,6 +69,8 @@ namespace VRProject.Presentation.Combat
             var worldTip = _camera.TransformPoint(_virtualTipOffset);
             var worldHandle = _camera.TransformPoint(_virtualTipOffset * 0.35f);
 
+            ApplyWeaponRootPose(worldHandle, worldTip);
+
             if (_tip != null)
                 _tip.position = worldTip;
             if (_handle != null)
@@ -78,6 +80,20 @@ namespace VRProject.Presentation.Combat
                 _forwardReference.position = worldHandle;
                 _forwardReference.rotation = _camera.rotation;
             }
+        }
+
+        void ApplyWeaponRootPose(Vector3 worldHandle, Vector3 worldTip)
+        {
+            if (_handle == null)
+                return;
+
+            var forward = worldTip - worldHandle;
+            if (forward.sqrMagnitude < 1e-6f)
+                forward = _camera.forward;
+
+            var rotation = Quaternion.LookRotation(forward.normalized, _camera.up);
+            transform.rotation = rotation;
+            transform.position = worldHandle - rotation * _handle.localPosition;
         }
 
         public WeaponMotionPose SamplePose()
