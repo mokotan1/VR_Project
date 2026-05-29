@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: e20bae5945cb1c94a9b50664b825be36
+timeCreated: 1554659338
+licenseType: Store
+NativeFormatImporter:
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 143767
+  packageName: Fire Axe
+  packageVersion: 1.0
+  assetPath: Assets/Fire Axe/Material/Specular_Fire_Axe.mat
+  uploadId: 304544

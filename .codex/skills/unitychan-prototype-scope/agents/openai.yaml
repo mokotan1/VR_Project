@@ -1,0 +1,4 @@
+interface:
+  display_name: "UnityChan Prototype Scope"
+  short_description: "Keep Unity scene work scoped to UnityChanPrototypeFps."
+  default_prompt: "Use the UnityChanPrototypeFps scene as the only working scene for this VR project unless the user explicitly says otherwise."

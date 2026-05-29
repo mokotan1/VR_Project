@@ -17,7 +17,7 @@ namespace VRProject.Presentation.Startup
     public sealed class DeviceConnectionView : ViewBase
     {
         [Header("Scene")]
-        [SerializeField] string _gameplaySceneName = "CrystalDefensePrototype";
+        [SerializeField] string _gameplaySceneName = "UnityChanPrototypeFps";
 
         [Header("Dependencies")]
         [SerializeField] DeviceConnectionProbe _probe;

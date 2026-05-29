@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: de22d7c02be7abe4a88c0b45fed02d32
+timeCreated: 1554662394
+licenseType: Store
+NativeFormatImporter:
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 143767
+  packageName: Fire Axe
+  packageVersion: 1.0
+  assetPath: Assets/Fire Axe/Prefab/Specular/Fire_Axe_LODB.prefab
+  uploadId: 304544

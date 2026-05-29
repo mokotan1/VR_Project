@@ -17,7 +17,7 @@ namespace VRProject.EditorTools
     public static class StartupSceneMenu
     {
         const string StartupScenePath = "Assets/Scenes/Startup.unity";
-        const string GameplaySceneName = "CrystalDefensePrototype";
+        const string GameplaySceneName = "UnityChanPrototypeFps";
 
         [MenuItem("VR Project/Scenes/Create Startup Device Selection Scene")]
         public static void CreateStartupScene()

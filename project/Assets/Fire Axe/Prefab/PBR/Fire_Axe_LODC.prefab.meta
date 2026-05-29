@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: c574fbbe0eae5c14a94bc3bd50a12d50
+timeCreated: 1554662250
+licenseType: Store
+NativeFormatImporter:
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 143767
+  packageName: Fire Axe
+  packageVersion: 1.0
+  assetPath: Assets/Fire Axe/Prefab/PBR/Fire_Axe_LODC.prefab
+  uploadId: 304544

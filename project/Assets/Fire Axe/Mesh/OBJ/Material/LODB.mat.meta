@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 559bbdbdf0f657043839a59b4517e9e5
+timeCreated: 1554658287
+licenseType: Store
+NativeFormatImporter:
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 143767
+  packageName: Fire Axe
+  packageVersion: 1.0
+  assetPath: Assets/Fire Axe/Mesh/OBJ/Material/LODB.mat
+  uploadId: 304544
