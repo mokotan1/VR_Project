@@ -258,6 +258,49 @@ namespace VRProject.EditorTools
                       ". Locomotion: dyrdadev First-Person Controller; mantle probe omitted. Requires Input System + UniRx per package README.");
         }
 
+        [MenuItem("VR Project/Scenes/Wire Unity-Chan Prototype Enemy Demolish")]
+        public static void WireEnemyDemolishInOpenScene()
+        {
+            var scene = SceneManager.GetActiveScene();
+            if (!string.Equals(scene.path, ScenePath, StringComparison.OrdinalIgnoreCase))
+            {
+                Debug.LogWarning(
+                    "[VR Project] Open UnityChanPrototypeFps before wiring enemy demolish. Current scene: " +
+                    (string.IsNullOrEmpty(scene.path) ? scene.name : scene.path));
+                return;
+            }
+
+            var wiredCount = 0;
+            foreach (var root in scene.GetRootGameObjects())
+                wiredCount += WireEnemyDemolishRecursive(root);
+
+            if (wiredCount == 0)
+            {
+                Debug.LogWarning("[VR Project] No Enemy_Agent objects found in UnityChanPrototypeFps.");
+                return;
+            }
+
+            EditorSceneManager.MarkSceneDirty(scene);
+            EditorSceneManager.SaveScene(scene);
+            Debug.Log($"[VR Project] Wired EnemyPoseDemolishOnDeath on {wiredCount} UnityChanPrototypeFps enemy agent(s).");
+        }
+
+        static int WireEnemyDemolishRecursive(GameObject candidate)
+        {
+            var wiredCount = 0;
+            if (candidate.name.StartsWith("Enemy_Agent", StringComparison.Ordinal) ||
+                string.Equals(candidate.tag, "Enemy", StringComparison.Ordinal))
+            {
+                if (UnityChanPrototypeEnemyDemolishSetup.Ensure(candidate))
+                    wiredCount++;
+            }
+
+            foreach (Transform child in candidate.transform)
+                wiredCount += WireEnemyDemolishRecursive(child.gameObject);
+
+            return wiredCount;
+        }
+
         static void EnsureAssetDirectoryExists(string assetPath)
         {
             if (string.IsNullOrEmpty(assetPath) || !assetPath.StartsWith("Assets/", StringComparison.Ordinal))
@@ -400,7 +443,7 @@ namespace VRProject.EditorTools
                 col.radius = 0.35f;
                 col.center = new Vector3(0f, 0.9f, 0f);
 
-                root.AddComponent<OsFpsInspiredDamageable>();
+                UnityChanPrototypeEnemyDemolishSetup.Ensure(root);
 
                 var vis = GameObject.CreatePrimitive(PrimitiveType.Capsule);
                 vis.name = "Body";

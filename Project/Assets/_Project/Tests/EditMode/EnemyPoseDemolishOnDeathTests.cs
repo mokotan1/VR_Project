@@ -1,5 +1,6 @@
 using NUnit.Framework;
 using UnityEngine;
+using UnityEngine.AI;
 using VRProject.Presentation.Gameplay;
 using VRProject.Presentation.OsFpsInspired;
 
@@ -71,6 +72,29 @@ namespace VRProject.Tests.EditMode
             {
                 if (go != null)
                     Object.DestroyImmediate(go);
+            }
+        }
+
+        [Test]
+        public void SetupUnityChanPrototypeEnemy_AddsOnlyGenericDeathDemolishComponents()
+        {
+            var enemy = new GameObject("Enemy_Agent");
+            try
+            {
+                enemy.AddComponent<NavMeshAgent>();
+
+                var configured = UnityChanPrototypeEnemyDemolishSetup.Ensure(enemy);
+
+                Assert.IsTrue(configured);
+                Assert.IsNotNull(enemy.GetComponent<OsFpsInspiredDamageable>());
+                Assert.IsNotNull(enemy.GetComponent<EnemyPoseDemolishOnDeath>());
+                Assert.IsNull(enemy.GetComponent<CrystalDefenseEnemyObjective>());
+                Assert.IsNull(enemy.GetComponent<CrystalDefenseEnemyAttack>());
+            }
+            finally
+            {
+                if (enemy != null)
+                    Object.DestroyImmediate(enemy);
             }
         }
     }
