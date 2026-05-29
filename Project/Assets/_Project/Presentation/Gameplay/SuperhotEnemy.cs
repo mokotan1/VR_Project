@@ -25,10 +25,16 @@ namespace VRProject.Presentation.Gameplay
         /// <param name="hit">When set (e.g. from hitscan), spawns shard VFX at impact.</param>
         public void Kill(RaycastHit? hit = null)
         {
-            if (hit.HasValue && _glassShardBurstPrefab != null)
-            {
-                GlassShardBurstSpawner.Spawn(_glassShardBurstPrefab, hit.Value.point, hit.Value.normal);
-            }
+            if (hit.HasValue)
+                Kill(hit.Value.point, hit.Value.normal);
+            else
+                Destroy(gameObject);
+        }
+
+        public void Kill(Vector3 hitPoint, Vector3 hitNormal)
+        {
+            if (_glassShardBurstPrefab != null)
+                GlassShardBurstSpawner.Spawn(_glassShardBurstPrefab, hitPoint, hitNormal);
 
             Destroy(gameObject);
         }

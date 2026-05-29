@@ -1,6 +1,7 @@
 using UnityEngine;
 using VRProject.Domain.Gameplay;
 using VRProject.Infrastructure.DI;
+using VRProject.Presentation.Common.UI;
 
 namespace VRProject.Presentation.Gameplay
 {
@@ -82,7 +83,11 @@ namespace VRProject.Presentation.Gameplay
 
         void Update()
         {
-            if (Input.GetKeyDown(KeyCode.Escape))
+            var mobile = MobileTouchInputBus.Instance;
+            var useMobile = mobile != null && mobile.IsMobileModeActive;
+            var mobileInput = useMobile ? mobile.Snapshot : MobileTouchInputSnapshot.Inactive;
+
+            if (!useMobile && Input.GetKeyDown(KeyCode.Escape))
             {
                 Cursor.lockState = Cursor.lockState == CursorLockMode.Locked
                     ? CursorLockMode.None
@@ -90,7 +95,18 @@ namespace VRProject.Presentation.Gameplay
                 Cursor.visible = Cursor.lockState != CursorLockMode.Locked;
             }
 
-            RefreshPlanarIntentAndSpeed();
+            if (useMobile)
+            {
+                Cursor.lockState = CursorLockMode.None;
+                Cursor.visible = false;
+                LastPlanarMoveIntent01 = new Vector2(mobileInput.MoveAxisX, mobileInput.MoveAxisY).magnitude;
+                if (LastPlanarMoveIntent01 > 1f)
+                    LastPlanarMoveIntent01 = 1f;
+            }
+            else
+            {
+                RefreshPlanarIntentAndSpeed();
+            }
 
             var simDt = _clock != null ? _clock.SimulationDeltaTime : Time.deltaTime;
             var dt = simDt > 1e-9f ? simDt : 0f;
@@ -101,12 +117,21 @@ namespace VRProject.Presentation.Gameplay
 
             var mx = 0f;
             var my = 0f;
-            if (Cursor.lockState == CursorLockMode.Locked && _cameraTransform != null)
+            if (useMobile && _cameraTransform != null)
+            {
+                mx = mobileInput.LookDeltaX;
+                my = -mobileInput.LookDeltaY;
+            }
+            else if (Cursor.lockState == CursorLockMode.Locked && _cameraTransform != null)
             {
                 var rawMx = Input.GetAxis("Mouse X") * _mouseSensitivity;
                 var rawMy = Input.GetAxis("Mouse Y") * _mouseSensitivity;
                 mx = rawMx * lookScale;
                 my = rawMy * lookScale;
+            }
+
+            if (_cameraTransform != null && (Mathf.Abs(mx) > 1e-6f || Mathf.Abs(my) > 1e-6f))
+            {
                 transform.Rotate(0f, mx, 0f);
                 _pitch -= my;
                 _pitch = Mathf.Clamp(_pitch, -89f, 89f);
@@ -121,7 +146,9 @@ namespace VRProject.Presentation.Gameplay
             else
                 _velocity.y += _gravity * dt;
 
-            var input = new Vector3(Input.GetAxis("Horizontal"), 0f, Input.GetAxis("Vertical"));
+            var input = useMobile
+                ? new Vector3(mobileInput.MoveAxisX, 0f, mobileInput.MoveAxisY)
+                : new Vector3(Input.GetAxis("Horizontal"), 0f, Input.GetAxis("Vertical"));
             var move = transform.TransformDirection(input) * (_moveSpeed * SpeedMultiplier);
             move.y = _velocity.y;
             _characterController.Move(move * dt);
@@ -129,9 +156,11 @@ namespace VRProject.Presentation.Gameplay
             var vel = _characterController.velocity;
             LastPlanarSpeedMetersPerSecond = new Vector3(vel.x, 0f, vel.z).magnitude;
             // 드라이버용: 시점 입력 강도는 실시간 초당으로(시점 회전은 위에서 이미 적용됨).
-            var rawForIntensity = Cursor.lockState == CursorLockMode.Locked
-                ? new Vector2(Input.GetAxis("Mouse X") * _mouseSensitivity, Input.GetAxis("Mouse Y") * _mouseSensitivity).magnitude
-                : 0f;
+            var rawForIntensity = useMobile
+                ? new Vector2(mobileInput.LookDeltaX, mobileInput.LookDeltaY).magnitude
+                : Cursor.lockState == CursorLockMode.Locked
+                    ? new Vector2(Input.GetAxis("Mouse X") * _mouseSensitivity, Input.GetAxis("Mouse Y") * _mouseSensitivity).magnitude
+                    : 0f;
             var udt = Mathf.Max(1e-6f, Time.unscaledDeltaTime);
             LastLookIntensityPerSecond = rawForIntensity / udt;
 

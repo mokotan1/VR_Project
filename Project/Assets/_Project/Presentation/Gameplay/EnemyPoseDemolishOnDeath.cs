@@ -13,14 +13,20 @@ namespace VRProject.Presentation.Gameplay
         [SerializeField] Material _interiorMaterial;
         [SerializeField, Range(4, 48)] int _breakPointCount = 14;
         [SerializeField, Range(0.03f, 1.5f)] float _breakRadius = 0.35f;
-        [SerializeField, Range(0f, 20f)] float _fragmentImpulse = 4.5f;
-        [SerializeField, Range(0f, 20f)] float _fragmentTorque = 2f;
+        [SerializeField, Range(0f, 20f)] float _fragmentImpulse = 7.5f;
+        [SerializeField, Range(0f, 20f)] float _fragmentTorque = 4f;
         [SerializeField, Range(0f, 30f)] float _fragmentLifetimeSeconds = 8f;
+        [SerializeField] bool _useRuntimeMeshDemolisher;
+        [SerializeField, Range(1, 16)] int _lowPolyShardCount = 10;
+        [SerializeField, Range(0.05f, 2f)] float _lowPolyShardScale = 0.75f;
+        [SerializeField, Range(0.25f, 3f)] float _lowPolyShardSpreadMultiplier = 1.6f;
+        [SerializeField] bool _lowPolyShardsUseBoxColliders;
 
         OsFpsInspiredDamageable _damageable;
         Vector3 _lastHitPoint;
         bool _hasHitPoint;
         bool _demolished;
+        bool _subscribed;
         Func<GameObject, Vector3, bool> _fragmentFactoryOverride;
 
         void Awake()
@@ -30,19 +36,34 @@ namespace VRProject.Presentation.Gameplay
 
         void OnEnable()
         {
-            if (_damageable != null)
-                _damageable.Damaged += OnDamaged;
+            SubscribeToDamageable();
         }
 
         void OnDisable()
         {
-            if (_damageable != null)
+            if (_damageable != null && _subscribed)
                 _damageable.Damaged -= OnDamaged;
+            _subscribed = false;
         }
 
         public void SetFragmentFactoryForTests(Func<GameObject, Vector3, bool> factory)
         {
             _fragmentFactoryOverride = factory;
+            SubscribeToDamageable();
+        }
+
+        void SubscribeToDamageable()
+        {
+            if (_subscribed)
+                return;
+
+            if (_damageable == null)
+                _damageable = GetComponent<OsFpsInspiredDamageable>();
+            if (_damageable == null)
+                return;
+
+            _damageable.Damaged += OnDamaged;
+            _subscribed = true;
         }
 
         public static Vector3[] BuildBreakPointPositions(Bounds bounds, Vector3 hitPoint, int count, float radius)
@@ -104,6 +125,12 @@ namespace VRProject.Presentation.Gameplay
                 return;
             }
 
+            if (!_useRuntimeMeshDemolisher)
+            {
+                DemolishWithLowPolyShardBurst(hitPoint);
+                return;
+            }
+
             if (!TryCreateSourceMeshObject(out var source, out var sourceRenderer, out var ownsSourceMesh))
                 return;
 
@@ -152,6 +179,53 @@ namespace VRProject.Presentation.Gameplay
                 }
                 Destroy(source);
             }
+        }
+
+        void DemolishWithLowPolyShardBurst(Vector3 hitPoint)
+        {
+            var sourceBounds = TryGetVisualBounds(out var sourceRenderer, out var visualBounds)
+                ? visualBounds
+                : new Bounds(transform.position, Vector3.one);
+            var material = ResolveInteriorMaterial(sourceRenderer);
+            var mobileDefaults = EnemyLowPolyShardBurst.Settings.MobileDefault;
+            var settings = new EnemyLowPolyShardBurst.Settings(
+                _lowPolyShardCount,
+                _lowPolyShardScale,
+                Mathf.Max(_fragmentImpulse, mobileDefaults.Impulse),
+                Mathf.Max(_fragmentTorque, mobileDefaults.Torque),
+                _lowPolyShardSpreadMultiplier,
+                _lowPolyShardsUseBoxColliders);
+            var parent = EnemyLowPolyShardBurst.Spawn(name, sourceBounds, hitPoint, material, settings);
+
+            HideOriginalEnemy();
+            if (_fragmentLifetimeSeconds > 0f)
+                Destroy(parent, _fragmentLifetimeSeconds + 0.25f);
+        }
+
+        bool TryGetVisualBounds(out Renderer firstRenderer, out Bounds visualBounds)
+        {
+            firstRenderer = null;
+            visualBounds = new Bounds(transform.position, Vector3.one);
+            var renderers = GetComponentsInChildren<Renderer>();
+            var initialized = false;
+
+            foreach (var renderer in renderers)
+            {
+                if (renderer == null || !renderer.enabled)
+                    continue;
+
+                if (!initialized)
+                {
+                    firstRenderer = renderer;
+                    visualBounds = renderer.bounds;
+                    initialized = true;
+                    continue;
+                }
+
+                visualBounds.Encapsulate(renderer.bounds);
+            }
+
+            return initialized;
         }
 
         bool TryCreateSourceMeshObject(out GameObject source, out Renderer sourceRenderer, out bool ownsMesh)

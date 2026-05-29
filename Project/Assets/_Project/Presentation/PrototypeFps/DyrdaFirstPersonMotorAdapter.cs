@@ -3,6 +3,7 @@ using DyrdaDev.FirstPersonController;
 using UniRx;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using VRProject.Presentation.Common.UI;
 
 namespace VRProject.Presentation.PrototypeFps
 {
@@ -63,7 +64,11 @@ namespace VRProject.Presentation.PrototypeFps
         public bool IsGrounded => _cc != null && _cc.isGrounded;
 
         public bool IsAiming =>
-            Mouse.current != null && Mouse.current.rightButton.isPressed && Cursor.lockState == CursorLockMode.Locked;
+            (MobileTouchInputBus.Instance != null &&
+             MobileTouchInputBus.Instance.IsMobileModeActive &&
+             MobileTouchInputBus.Instance.Snapshot.FireHeld)
+            || (Mouse.current != null && Mouse.current.rightButton.isPressed &&
+                Cursor.lockState == CursorLockMode.Locked);
 
         public float VerticalVelocity => _cc != null ? _cc.velocity.y : 0f;
 

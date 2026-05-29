@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.Rendering;
+using VRProject.Presentation.Common.UI;
 using VRProject.Presentation.Gameplay;
 using VRProject.Presentation.PrototypeFps;
 
@@ -316,7 +317,12 @@ namespace VRProject.Presentation.OsFpsInspired
                 return;
 
             var kb = Keyboard.current;
-            if (kb != null && kb.rKey.wasPressedThisFrame && !IsReloading && _ammoInMag < _magSize)
+            var mobile = MobileTouchInputBus.Instance;
+            var useMobile = mobile != null && mobile.IsMobileModeActive;
+            var mobileInput = useMobile ? mobile.Snapshot : MobileTouchInputSnapshot.Inactive;
+
+            if (((useMobile && mobileInput.ReloadPressedThisFrame) ||
+                 (kb != null && kb.rKey.wasPressedThisFrame)) && !IsReloading && _ammoInMag < _magSize)
                 _reloadEnds = Time.unscaledTime + _reloadDuration;
 
             if (IsReloading && Time.unscaledTime >= _reloadEnds)
@@ -328,16 +334,26 @@ namespace VRProject.Presentation.OsFpsInspired
             if (IsReloading)
                 return;
 
-            if (!OsFpsInspiredAimFireGate.PassesFireAimGate(
-                    _requireRightMouseAimToFire,
-                    _allowHipFireWhileLocomoting,
-                    _locomotionHipFireAxesSqrThreshold,
-                    _motor == null,
-                    _motor != null && _motor.IsAiming,
-                    _motor != null ? _motor.LocomotionAxes : Vector2.zero))
+            if (useMobile && mobileInput.ThrowPressedThisFrame)
+            {
+                TryThrowWeapon(cam);
+                return;
+            }
+
+            var passesAimGate = useMobile && mobileInput.FirePressedThisFrame
+                                || OsFpsInspiredAimFireGate.PassesFireAimGate(
+                                    _requireRightMouseAimToFire,
+                                    _allowHipFireWhileLocomoting,
+                                    _locomotionHipFireAxesSqrThreshold,
+                                    _motor == null,
+                                    _motor != null && _motor.IsAiming,
+                                    _motor != null ? _motor.LocomotionAxes : Vector2.zero);
+            if (!passesAimGate)
                 return;
 
-            var fire = Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame;
+            var fire = useMobile
+                ? mobileInput.FirePressedThisFrame
+                : Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame;
             if (!fire)
                 return;
 

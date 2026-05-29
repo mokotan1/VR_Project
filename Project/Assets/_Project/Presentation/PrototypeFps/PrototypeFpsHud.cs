@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
+using VRProject.Presentation.Common.UI;
 using VRProject.Presentation.OsFpsInspired;
 
 namespace VRProject.Presentation.PrototypeFps
@@ -41,6 +42,14 @@ namespace VRProject.Presentation.PrototypeFps
 
             if (_hintText == null)
                 return;
+
+            if (MobileTouchInputBus.Instance != null && MobileTouchInputBus.IsMobilePlayModeSelected())
+            {
+                _hintText.text =
+                    "Joystick 이동   오른쪽 드래그 시점   Melee 밴드 휘두르기\n" +
+                    "FIRE 발사   R 재장전   THROW 던지기   II 일시정지";
+                return;
+            }
 
             var pickup = _weapon != null && !_weapon.IsEquipped
                 ? "HK416 근처(약 1.3m)로 가면 자동 습득.\n"

@@ -11,6 +11,8 @@ using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 using DyrdaDev.FirstPersonController;
 using VRProject.Presentation.Common.Managers;
+using VRProject.Presentation.Common.UI;
+using VRProject.Presentation.Combat;
 using VRProject.Presentation.Gameplay;
 using VRProject.Presentation.OsFpsInspired;
 using VRProject.Presentation.PrototypeFps;
@@ -285,6 +287,60 @@ namespace VRProject.EditorTools
             Debug.Log($"[VR Project] Wired EnemyPoseDemolishOnDeath on {wiredCount} UnityChanPrototypeFps enemy agent(s).");
         }
 
+        [MenuItem("VR Project/Scenes/Wire Unity-Chan Prototype Weapon Muzzle")]
+        public static void WireWeaponMuzzleInOpenScene()
+        {
+            var scene = SceneManager.GetActiveScene();
+            if (!string.Equals(scene.path, ScenePath, StringComparison.OrdinalIgnoreCase))
+            {
+                Debug.LogWarning(
+                    "[VR Project] Open UnityChanPrototypeFps before wiring weapon muzzle. Current scene: " +
+                    (string.IsNullOrEmpty(scene.path) ? scene.name : scene.path));
+                return;
+            }
+
+            var wiredCount = 0;
+            foreach (var weapon in UnityEngine.Object.FindObjectsByType<OsFpsInspiredWeapon>(
+                         FindObjectsInactive.Include))
+            {
+                if (ConfigureUnityChanPrototypeWeaponMuzzle(weapon))
+                    wiredCount++;
+            }
+
+            if (wiredCount == 0)
+            {
+                Debug.LogWarning("[VR Project] No OsFpsInspiredWeapon found in UnityChanPrototypeFps.");
+                return;
+            }
+
+            EditorSceneManager.MarkSceneDirty(scene);
+            EditorSceneManager.SaveScene(scene);
+            Debug.Log($"[VR Project] Wired persistent muzzle and bullet settings on {wiredCount} weapon(s).");
+        }
+
+        [MenuItem("VR Project/Scenes/Wire Current Scene Dev Mode HUD")]
+        public static void WireDevModeHudInOpenScene()
+        {
+            var scene = SceneManager.GetActiveScene();
+            if (!scene.IsValid() || !scene.isLoaded)
+            {
+                Debug.LogWarning("[VR Project] No loaded active scene to wire Dev Mode HUD.");
+                return;
+            }
+
+            var player = FindDevModeHudAnchor(scene);
+            if (player == null)
+            {
+                Debug.LogWarning("[VR Project] Could not find Player, UnityChan_Player, or SuperhotGameplayDriver in current scene.");
+                return;
+            }
+
+            SuperhotDevModeHudInstaller.EnsureUnderPlayer(player);
+            EditorSceneManager.MarkSceneDirty(scene);
+            EditorSceneManager.SaveScene(scene);
+            Debug.Log("[VR Project] Dev Mode HUD wired. Enter Play Mode and press F1 to toggle.");
+        }
+
         static int WireEnemyDemolishRecursive(GameObject candidate)
         {
             var wiredCount = 0;
@@ -299,6 +355,47 @@ namespace VRProject.EditorTools
                 wiredCount += WireEnemyDemolishRecursive(child.gameObject);
 
             return wiredCount;
+        }
+
+        static GameObject FindDevModeHudAnchor(Scene scene)
+        {
+            foreach (var root in scene.GetRootGameObjects())
+            {
+                var tagged = FindInChildren(root, candidate => string.Equals(candidate.tag, "Player", StringComparison.Ordinal));
+                if (tagged != null)
+                    return tagged;
+            }
+
+            foreach (var root in scene.GetRootGameObjects())
+            {
+                var named = FindInChildren(root, candidate => string.Equals(candidate.name, "UnityChan_Player", StringComparison.Ordinal));
+                if (named != null)
+                    return named;
+            }
+
+            foreach (var root in scene.GetRootGameObjects())
+            {
+                var driver = root.GetComponentInChildren<SuperhotGameplayDriver>(true);
+                if (driver != null)
+                    return driver.gameObject;
+            }
+
+            return null;
+        }
+
+        static GameObject FindInChildren(GameObject root, Predicate<GameObject> match)
+        {
+            if (match(root))
+                return root;
+
+            foreach (Transform child in root.transform)
+            {
+                var found = FindInChildren(child.gameObject, match);
+                if (found != null)
+                    return found;
+            }
+
+            return null;
         }
 
         static void EnsureAssetDirectoryExists(string assetPath)
@@ -454,6 +551,9 @@ namespace VRProject.EditorTools
                     vis.GetComponent<MeshRenderer>().sharedMaterial = new Material(litShader) { color = new Color(0.72f, 0.12f, 0.1f) };
 
                 root.AddComponent<SuperhotEnemyBrain>();
+                root.AddComponent<SuperhotEnemy>();
+                root.AddComponent<DamageReceiver>();
+                MeleeEnemySetup.Ensure(root);
 
                 if (enemyLayer >= 0)
                     SetLayerRecursively(root, enemyLayer);
@@ -683,16 +783,70 @@ namespace VRProject.EditorTools
                 wSo.FindProperty("_bulletVisualPrefab").objectReferenceValue = bulletPrefab;
             var bulletScale = wSo.FindProperty("_bulletVisualScale");
             if (bulletScale != null)
-                bulletScale.floatValue = 56f;
+                bulletScale.floatValue = UnityChanPrototypeWeaponMuzzleDefaults.BulletVisualScale;
+            var bulletSpeed = wSo.FindProperty("_bulletSpeed");
+            if (bulletSpeed != null)
+                bulletSpeed.floatValue = UnityChanPrototypeWeaponMuzzleDefaults.BulletSpeed;
+            var bulletMuzzleOffset = wSo.FindProperty("_bulletMuzzleForwardOffset");
+            if (bulletMuzzleOffset != null)
+                bulletMuzzleOffset.floatValue = UnityChanPrototypeWeaponMuzzleDefaults.BulletMuzzleForwardOffset;
             var bulletEuler = wSo.FindProperty("_bulletVisualEulerOffset");
             if (bulletEuler != null)
-                bulletEuler.vector3Value = new Vector3(90f, 0f, 0f);
+                bulletEuler.vector3Value = UnityChanPrototypeWeaponMuzzleDefaults.BulletVisualEulerOffset;
             wSo.ApplyModifiedPropertiesWithoutUndo();
 
             if (fpsViewmodelUnderCamera && viewmodelRootGo != null)
                 FpsViewmodelRenderingSetup.Apply(cam, viewmodelRootGo);
 
             UnityChanUrpMaterialRemapUtility.RemapRenderersUnder(player);
+        }
+
+        static bool ConfigureUnityChanPrototypeWeaponMuzzle(OsFpsInspiredWeapon weapon)
+        {
+            if (weapon == null)
+                return false;
+
+            var so = new SerializedObject(weapon);
+            var handGunVisualProperty = so.FindProperty("_handGunVisual");
+            var gunVisual = handGunVisualProperty != null
+                ? handGunVisualProperty.objectReferenceValue as GameObject
+                : null;
+            if (gunVisual == null)
+                gunVisual = FindChildGameObject(weapon.transform, "HandGun_HK416")
+                            ?? FindChildGameObject(weapon.transform, "ToyGun");
+
+            if (gunVisual == null)
+                return false;
+
+            handGunVisualProperty.objectReferenceValue = gunVisual;
+
+            var muzzle = UnityChanPrototypeWeaponMuzzleDefaults.EnsureFirePoint(gunVisual);
+            if (muzzle != null)
+                so.FindProperty("_muzzleTransform").objectReferenceValue = muzzle;
+
+            var bulletPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(BulletPackPrefab01Path);
+            if (bulletPrefab != null)
+                so.FindProperty("_bulletVisualPrefab").objectReferenceValue = bulletPrefab;
+
+            so.FindProperty("_bulletVisualScale").floatValue = UnityChanPrototypeWeaponMuzzleDefaults.BulletVisualScale;
+            so.FindProperty("_bulletSpeed").floatValue = UnityChanPrototypeWeaponMuzzleDefaults.BulletSpeed;
+            so.FindProperty("_bulletMuzzleForwardOffset").floatValue =
+                UnityChanPrototypeWeaponMuzzleDefaults.BulletMuzzleForwardOffset;
+            so.FindProperty("_bulletVisualEulerOffset").vector3Value =
+                UnityChanPrototypeWeaponMuzzleDefaults.BulletVisualEulerOffset;
+            so.ApplyModifiedPropertiesWithoutUndo();
+            return true;
+        }
+
+        static GameObject FindChildGameObject(Transform root, string childName)
+        {
+            foreach (var child in root.GetComponentsInChildren<Transform>(true))
+            {
+                if (child.name == childName)
+                    return child.gameObject;
+            }
+
+            return null;
         }
 
         /// <summary>프로토타입 씬의 CC 높이(기본 1.35m) 대비 비율로 뷰모델/손 총 스케일을 맞춥니다.</summary>
@@ -800,57 +954,7 @@ namespace VRProject.EditorTools
         }
 
         static Transform CreateWeaponFirePointUnderGun(GameObject gunVisual)
-        {
-            var gunRoot = gunVisual.transform;
-            foreach (var tr in gunRoot.GetComponentsInChildren<Transform>(true))
-            {
-                var n = tr.name.ToLowerInvariant();
-                if (n.Contains("muzzle") || n.Contains("firepoint") || n.Contains("fire_point") || n.Contains("barrel_tip"))
-                    return tr;
-            }
-
-            var renderers = gunVisual.GetComponentsInChildren<Renderer>(true);
-            if (renderers.Length == 0)
-            {
-                var fp = new GameObject("WeaponFirePoint");
-                fp.transform.SetParent(gunRoot, false);
-                fp.transform.localPosition = new Vector3(0f, 0f, 0.35f);
-                fp.transform.localRotation = Quaternion.identity;
-                return fp.transform;
-            }
-
-            var b = renderers[0].bounds;
-            for (var i = 1; i < renderers.Length; i++)
-                b.Encapsulate(renderers[i].bounds);
-
-            var forward = gunRoot.forward;
-            var c = b.center;
-            var e = b.extents;
-            var corners = new Vector3[8];
-            var idx = 0;
-            for (var x = -1f; x <= 1f; x += 2f)
-            for (var y = -1f; y <= 1f; y += 2f)
-            for (var z = -1f; z <= 1f; z += 2f)
-                corners[idx++] = c + new Vector3(e.x * x, e.y * y, e.z * z);
-
-            var best = corners[0];
-            var bestDot = float.MinValue;
-            foreach (var p in corners)
-            {
-                var d = Vector3.Dot(p - b.center, forward);
-                if (d > bestDot)
-                {
-                    bestDot = d;
-                    best = p;
-                }
-            }
-
-            var go = new GameObject("WeaponFirePoint");
-            go.transform.position = best;
-            go.transform.rotation = Quaternion.LookRotation(forward, gunRoot.up);
-            go.transform.SetParent(gunRoot, true);
-            return go.transform;
-        }
+            => UnityChanPrototypeWeaponMuzzleDefaults.EnsureFirePoint(gunVisual);
 
         static Transform CreateToyGunFirePoint(Transform gunRoot)
         {
@@ -1122,6 +1226,9 @@ namespace VRProject.EditorTools
             hSo.FindProperty("_hintText").objectReferenceValue = hintTxt;
             hSo.FindProperty("_crosshairRoot").objectReferenceValue = crosshairGo;
             hSo.ApplyModifiedPropertiesWithoutUndo();
+
+            SuperhotDevModeHudInstaller.EnsureUnderPlayer(player);
+            MobileTouchControlPanelInstaller.EnsureUnderPlayer(player);
         }
 
         static void TrySetTag(GameObject go, string tag)

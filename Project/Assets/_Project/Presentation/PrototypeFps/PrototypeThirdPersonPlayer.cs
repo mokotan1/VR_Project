@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
+using VRProject.Presentation.Common.UI;
 
 namespace VRProject.Presentation.PrototypeFps
 {
@@ -39,8 +40,18 @@ namespace VRProject.Presentation.PrototypeFps
         /// <summary>Mecanim axes: x = Direction (strafe), y = Speed (Unity-Chan Locomotions).</summary>
         public Vector2 LocomotionAxes => _lastLocomotionAxes;
         public bool IsGrounded => _characterController != null && _characterController.isGrounded;
-        public bool IsAiming =>
-            Mouse.current != null && Mouse.current.rightButton.isPressed && Cursor.lockState == CursorLockMode.Locked;
+        public bool IsAiming
+        {
+            get
+            {
+                var mobile = MobileTouchInputBus.Instance;
+                if (mobile != null && mobile.IsMobileModeActive && mobile.Snapshot.FireHeld)
+                    return true;
+
+                return Mouse.current != null && Mouse.current.rightButton.isPressed &&
+                       Cursor.lockState == CursorLockMode.Locked;
+            }
+        }
 
         public float VerticalVelocity => _verticalVelocity;
 
@@ -108,7 +119,11 @@ namespace VRProject.Presentation.PrototypeFps
 
         void Update()
         {
-            if (Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame)
+            var mobile = MobileTouchInputBus.Instance;
+            var useMobile = mobile != null && mobile.IsMobileModeActive;
+            var mobileInput = useMobile ? mobile.Snapshot : MobileTouchInputSnapshot.Inactive;
+
+            if (!useMobile && Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame)
             {
                 var locked = Cursor.lockState == CursorLockMode.Locked;
                 Cursor.lockState = locked ? CursorLockMode.None : CursorLockMode.Locked;
@@ -118,7 +133,15 @@ namespace VRProject.Presentation.PrototypeFps
             if (!_controlsEnabled || _camera == null || _cameraPivot == null)
                 return;
 
-            if (Cursor.lockState == CursorLockMode.Locked && Mouse.current != null)
+            if (useMobile)
+            {
+                Cursor.lockState = CursorLockMode.None;
+                Cursor.visible = false;
+                _yaw += mobileInput.LookDeltaX;
+                _pitch -= mobileInput.LookDeltaY;
+                _pitch = Mathf.Clamp(_pitch, -88f, 88f);
+            }
+            else if (Cursor.lockState == CursorLockMode.Locked && Mouse.current != null)
             {
                 var sens = IsAiming ? _mouseSensitivity * _aimMouseSensitivityMultiplier : _mouseSensitivity;
                 var d = Mouse.current.delta.ReadValue();
@@ -138,7 +161,12 @@ namespace VRProject.Presentation.PrototypeFps
 
             var kb = Keyboard.current;
             var input = Vector3.zero;
-            if (kb != null)
+            if (useMobile)
+            {
+                input.x = mobileInput.MoveAxisX;
+                input.z = mobileInput.MoveAxisY;
+            }
+            else if (kb != null)
             {
                 if (kb.wKey.isPressed || kb.upArrowKey.isPressed) input.z += 1f;
                 if (kb.sKey.isPressed || kb.downArrowKey.isPressed) input.z -= 1f;
