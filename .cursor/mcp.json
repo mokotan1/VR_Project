@@ -6,6 +6,10 @@
       "args": ["${workspaceFolder}/tools/hwp-mcp/run.py"],
       "env": {}
     },
+    "local-http-mcp": {
+      "type": "streamable-http",
+      "url": "http://127.0.0.1:8080/mcp"
+    },
     "superpowers": {
       "type": "stdio",
       "command": "python",

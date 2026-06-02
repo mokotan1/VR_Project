@@ -200,12 +200,13 @@ public enum Sign
 
 public static class PointComputation
 {
+#if UNITY_EDITOR_OSX || UNITY_STANDALONE_OSX || UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN || UNITY_STANDALONE_LINUX
 
-    #if UNITY_EDITOR_OSX || UNITY_STANDALONE_OSX
+#if UNITY_EDITOR_OSX || UNITY_STANDALONE_OSX
     private const string dllName = "IndirectPredicates_Mac";
-    #elif UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN
+#else
     private const string dllName = "IndirectPredicates_Windows";
-    #endif
+#endif
 
     [System.Runtime.InteropServices.DllImport(dllName)]
     private static extern void Initialize();
@@ -235,14 +236,222 @@ public static class PointComputation
     private static extern bool PointInInnerTriangle();
     [System.Runtime.InteropServices.DllImport(dllName)]
     private static extern bool PointInTriangle();
+#else
 
+    private static readonly List<Point3D> managedPoints = new List<Point3D>();
+
+    private static void Initialize()
+    {
+    }
+
+    private static void ResetManagedPoints()
+    {
+        managedPoints.Clear();
+    }
+
+    private static int ManagedOrient3D()
+    {
+        Point3D a = managedPoints[0];
+        Point3D b = managedPoints[1];
+        Point3D c = managedPoints[2];
+        Point3D d = managedPoints[3];
+        double det = Point3D.Dot(a - d, Point3D.Cross(b - d, c - d));
+        if(det > Constant.EPSILON_D)
+        {
+            return -1;
+        }
+        if(det < -Constant.EPSILON_D)
+        {
+            return 1;
+        }
+        return 0;
+    }
+
+    private static int ManagedInCircumsphere()
+    {
+        Point3D a = managedPoints[0];
+        Point3D b = managedPoints[1];
+        Point3D c = managedPoints[2];
+        Point3D d = managedPoints[3];
+        Point3D p = managedPoints[4];
+        Point3D center = CircumsphereFromFourPoints(a, b, c, d);
+        double radiusSquared = Point3D.SquareMagnitude(a - center);
+        double delta = Point3D.SquareMagnitude(p - center) - radiusSquared;
+        if(delta < -Constant.EPSILON_D)
+        {
+            return -1;
+        }
+        if(delta > Constant.EPSILON_D)
+        {
+            return 1;
+        }
+        return 0;
+    }
+
+    private static int ManagedDotProductSign()
+    {
+        Point3D a = managedPoints[0];
+        Point3D b = managedPoints[1];
+        Point3D c = managedPoints[2];
+        double dot = Point3D.Dot(a - c, b - c);
+        if(dot < -Constant.EPSILON_D)
+        {
+            return -1;
+        }
+        if(dot > Constant.EPSILON_D)
+        {
+            return 1;
+        }
+        return 0;
+    }
+
+    private static bool ManagedPointInInnerSegment()
+    {
+        Point3D a = managedPoints[0];
+        Point3D b = managedPoints[1];
+        Point3D c = managedPoints[2];
+        Point3D bc = c - b;
+        double bcLengthSquared = Point3D.SquareMagnitude(bc);
+        if(bcLengthSquared <= Constant.EPSILON_D)
+        {
+            return false;
+        }
+        double t = Point3D.Dot(a - b, bc) / bcLengthSquared;
+        return t > Constant.EPSILON_D && t < 1d - Constant.EPSILON_D;
+    }
+
+    private static bool ManagedSegmentCrossInnerSegment()
+    {
+        return ManagedSegmentsCross(true);
+    }
+
+    private static bool ManagedPointInInnerTriangle()
+    {
+        return ManagedPointInTriangle(true);
+    }
+
+    private static bool ManagedPointInTriangle()
+    {
+        return ManagedPointInTriangle(false);
+    }
+
+    private static bool ManagedLineCrossTriangle()
+    {
+        return ManagedLineCrossTriangle(false);
+    }
+
+    private static bool ManagedLineCrossInnerTriangle()
+    {
+        return ManagedLineCrossTriangle(true);
+    }
+
+    private static bool ManagedInnerSegmentCrossInnerTriangle()
+    {
+        Point3D a = managedPoints[0];
+        Point3D b = managedPoints[1];
+        Point3D c = managedPoints[2];
+        Point3D d = managedPoints[3];
+        Point3D e = managedPoints[4];
+        var (hit, t) = LinePlaneIntersection(a, b, c, d, e);
+        if(t <= Constant.EPSILON_D || t >= 1d - Constant.EPSILON_D)
+        {
+            return false;
+        }
+        return ManagedPointInTriangle(hit, c, d, e, true);
+    }
+
+    private static bool ManagedSegmentsCross(bool requireInteriorIntersection)
+    {
+        Point3D a = managedPoints[0];
+        Point3D b = managedPoints[1];
+        Point3D c = managedPoints[2];
+        Point3D d = managedPoints[3];
+        int o1 = ManagedOrientOnPoints(a, b, c, d);
+        int o2 = ManagedOrientOnPoints(a, b, d, c);
+        int o3 = ManagedOrientOnPoints(c, d, a, b);
+        int o4 = ManagedOrientOnPoints(c, d, b, a);
+        if(requireInteriorIntersection)
+        {
+            return o1 * o2 < 0 && o3 * o4 < 0;
+        }
+        return o1 * o2 <= 0 && o3 * o4 <= 0 && (o1 != 0 || o2 != 0 || o3 != 0 || o4 != 0);
+    }
+
+    private static bool ManagedPointInTriangle(bool requireInterior)
+    {
+        Point3D a = managedPoints[0];
+        Point3D b = managedPoints[1];
+        Point3D c = managedPoints[2];
+        Point3D d = managedPoints[3];
+        return ManagedPointInTriangle(a, b, c, d, requireInterior);
+    }
+
+    private static bool ManagedPointInTriangle(Point3D point, Point3D b, Point3D c, Point3D d, bool requireInterior)
+    {
+        int o0 = ManagedOrientOnPoints(b, c, d, point);
+        int o1 = ManagedOrientOnPoints(c, d, b, point);
+        int o2 = ManagedOrientOnPoints(d, b, c, point);
+        if(requireInterior)
+        {
+            return o0 > 0 && o1 > 0 && o2 > 0;
+        }
+        return o0 >= 0 && o1 >= 0 && o2 >= 0;
+    }
+
+    private static bool ManagedLineCrossTriangle(bool requireInterior)
+    {
+        Point3D a = managedPoints[0];
+        Point3D b = managedPoints[1];
+        Point3D c = managedPoints[2];
+        Point3D d = managedPoints[3];
+        Point3D e = managedPoints[4];
+        var (hit, t) = LinePlaneIntersection(a, b, c, d, e);
+        if(requireInterior)
+        {
+            if(t <= Constant.EPSILON_D || t >= 1d - Constant.EPSILON_D)
+            {
+                return false;
+            }
+            return ManagedPointInTriangle(hit, c, d, e, true);
+        }
+        if(t < -Constant.EPSILON_D || t > 1d + Constant.EPSILON_D)
+        {
+            return false;
+        }
+        return ManagedPointInTriangle(hit, c, d, e, false);
+    }
+
+    private static int ManagedOrientOnPoints(Point3D a, Point3D b, Point3D c, Point3D d)
+    {
+        double det = Point3D.Dot(a - d, Point3D.Cross(b - d, c - d));
+        if(det > Constant.EPSILON_D)
+        {
+            return -1;
+        }
+        if(det < -Constant.EPSILON_D)
+        {
+            return 1;
+        }
+        return 0;
+    }
+#endif
 
     private static double[] t0 = new double[3];
     private static double[] t1 = new double[3];
 
 
+    private static void ResetPoints()
+    {
+#if UNITY_EDITOR_OSX || UNITY_STANDALONE_OSX || UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN || UNITY_STANDALONE_LINUX
+        Reset();
+#else
+        ResetManagedPoints();
+#endif
+    }
+
     private static void AddPoint(IPointLocation p)
     {
+#if UNITY_EDITOR_OSX || UNITY_STANDALONE_OSX || UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN || UNITY_STANDALONE_LINUX
         if(p is Point3D)
         {
             for(int i=0; i<3; i++)
@@ -260,6 +469,99 @@ public static class PointComputation
             }
             AddImplicitPoint(t0,t1, ((Point3DImplicit)p).t);
         }
+#else
+        managedPoints.Add(p.ToPoint3D());
+#endif
+    }
+
+    private static int EvaluateOrient3D()
+    {
+#if UNITY_EDITOR_OSX || UNITY_STANDALONE_OSX || UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN || UNITY_STANDALONE_LINUX
+        return Orient3D();
+#else
+        return ManagedOrient3D();
+#endif
+    }
+
+    private static int EvaluateInCircumsphere()
+    {
+#if UNITY_EDITOR_OSX || UNITY_STANDALONE_OSX || UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN || UNITY_STANDALONE_LINUX
+        return InCircumsphere();
+#else
+        return ManagedInCircumsphere();
+#endif
+    }
+
+    private static bool EvaluateLineCrossInnerTriangle()
+    {
+#if UNITY_EDITOR_OSX || UNITY_STANDALONE_OSX || UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN || UNITY_STANDALONE_LINUX
+        return LineCrossInnerTriangle();
+#else
+        return ManagedLineCrossInnerTriangle();
+#endif
+    }
+
+    private static bool EvaluateLineCrossTriangle()
+    {
+#if UNITY_EDITOR_OSX || UNITY_STANDALONE_OSX || UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN || UNITY_STANDALONE_LINUX
+        return LineCrossTriangle();
+#else
+        return ManagedLineCrossTriangle();
+#endif
+    }
+
+    private static int EvaluateDotProductSign()
+    {
+#if UNITY_EDITOR_OSX || UNITY_STANDALONE_OSX || UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN || UNITY_STANDALONE_LINUX
+        return DotProductSign();
+#else
+        return ManagedDotProductSign();
+#endif
+    }
+
+    private static bool EvaluatePointInInnerSegment()
+    {
+#if UNITY_EDITOR_OSX || UNITY_STANDALONE_OSX || UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN || UNITY_STANDALONE_LINUX
+        return PointInInnerSegment();
+#else
+        return ManagedPointInInnerSegment();
+#endif
+    }
+
+    private static bool EvaluateSegmentCrossInnerSegment()
+    {
+#if UNITY_EDITOR_OSX || UNITY_STANDALONE_OSX || UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN || UNITY_STANDALONE_LINUX
+        return SegmentCrossInnerSegment();
+#else
+        return ManagedSegmentCrossInnerSegment();
+#endif
+    }
+
+    private static bool EvaluateInnerSegmentCrossInnerTriangle()
+    {
+#if UNITY_EDITOR_OSX || UNITY_STANDALONE_OSX || UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN || UNITY_STANDALONE_LINUX
+        return InnerSegmentCrossInnerTriangle();
+#else
+        return ManagedInnerSegmentCrossInnerTriangle();
+#endif
+    }
+
+    private static bool EvaluatePointInInnerTriangle()
+    {
+#if UNITY_EDITOR_OSX || UNITY_STANDALONE_OSX || UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN || UNITY_STANDALONE_LINUX
+        return PointInInnerTriangle();
+#else
+        return ManagedPointInInnerTriangle();
+#endif
+    }
+
+    private static bool EvaluatePointInTriangle()
+    {
+#if UNITY_EDITOR_OSX || UNITY_STANDALONE_OSX || UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN || UNITY_STANDALONE_LINUX
+        return PointInTriangle();
+#else
+        return ManagedPointInTriangle();
+#endif
     }
 
     public static void Init()
@@ -270,13 +572,13 @@ public static class PointComputation
     // left hand rule, curl fingers from a->b->c, positive if thumb points toward d
     public static Sign Orient(IPointLocation a, IPointLocation b, IPointLocation c, IPointLocation d)
     {
-        Reset();
+        ResetPoints();
         AddPoint(a);
         AddPoint(b);
         AddPoint(c);
         AddPoint(d);
 
-        int res = Orient3D(); // this lib decided to use right hand rule
+        int res = EvaluateOrient3D(); // this lib decided to use right hand rule
         if(res<0)
         {
             return Sign.POSITIVE;
@@ -291,14 +593,14 @@ public static class PointComputation
     // positive if p in a,b,c,d; zero if on, negative if out. orient(a,b,c,d) is positive
     public static Sign InCircumsphere(IPointLocation a, IPointLocation b, IPointLocation c, IPointLocation d, IPointLocation p)
     {
-        Reset();
+        ResetPoints();
         AddPoint(a);
         AddPoint(b);
         AddPoint(c);
         AddPoint(d);
         AddPoint(p);
 
-        int res = InCircumsphere(); // this lib decided to use right hand rule
+        int res = EvaluateInCircumsphere(); // this lib decided to use right hand rule
         if(res<0)
         {
             return Sign.POSITIVE;
@@ -313,14 +615,14 @@ public static class PointComputation
     //positive if a->b corsses c,d,e
     public static Sign LineCrossInnerTriangle(IPointLocation a, IPointLocation b, IPointLocation c, IPointLocation d, IPointLocation e)
     {
-        Reset();
+        ResetPoints();
         AddPoint(a);
         AddPoint(b);
         AddPoint(c);
         AddPoint(d);
         AddPoint(e);
 
-        bool res = LineCrossInnerTriangle();
+        bool res = EvaluateLineCrossInnerTriangle();
         if(res)
         {
             return Sign.POSITIVE;
@@ -329,14 +631,14 @@ public static class PointComputation
     }
     public static Sign LineCrossTriangle(IPointLocation a, IPointLocation b, IPointLocation c, IPointLocation d, IPointLocation e)
     {
-        Reset();
+        ResetPoints();
         AddPoint(a);
         AddPoint(b);
         AddPoint(c);
         AddPoint(d);
         AddPoint(e);
 
-        bool res = LineCrossTriangle();
+        bool res = EvaluateLineCrossTriangle();
         if(res)
         {
             return Sign.POSITIVE;
@@ -347,11 +649,11 @@ public static class PointComputation
     // sign of (a-c) dot (b-c)
     public static Sign DotProductSign(IPointLocation a, IPointLocation b, IPointLocation c)
     {
-        Reset();
+        ResetPoints();
         AddPoint(a);
         AddPoint(b);
         AddPoint(c);
-        int res = DotProductSign();
+        int res = EvaluateDotProductSign();
         if(res<0)
         {
             return Sign.NEGATIVE;
@@ -366,11 +668,11 @@ public static class PointComputation
     // positive if a in inner b->c
     public static Sign PointInInnerSegment(IPointLocation a, IPointLocation b, IPointLocation c)
     {
-        Reset();
+        ResetPoints();
         AddPoint(a);
         AddPoint(b);
         AddPoint(c);
-        bool res = PointInInnerSegment();
+        bool res = EvaluatePointInInnerSegment();
         if(res)
         {
             return Sign.POSITIVE;
@@ -381,12 +683,12 @@ public static class PointComputation
     // positive if inner a->b crosses inner of c->d. a,b,c,d must be coplanar
     public static Sign SegmentCrossInnerSegment(IPointLocation a, IPointLocation b, IPointLocation c, IPointLocation d)
     {
-        Reset();
+        ResetPoints();
         AddPoint(a);
         AddPoint(b);
         AddPoint(c);
         AddPoint(d);
-        bool res = SegmentCrossInnerSegment();
+        bool res = EvaluateSegmentCrossInnerSegment();
         if(res)
         {
             return Sign.POSITIVE;
@@ -397,13 +699,13 @@ public static class PointComputation
     // positive if interior of a->b inersects interior of c,d,e at a single point
     public static Sign InnerSegmentCrossInnerTriangle(IPointLocation a, IPointLocation b, IPointLocation c, IPointLocation d, IPointLocation e)
     {
-        Reset();
+        ResetPoints();
         AddPoint(a);
         AddPoint(b);
         AddPoint(c);
         AddPoint(d);
         AddPoint(e);
-        bool res = InnerSegmentCrossInnerTriangle();
+        bool res = EvaluateInnerSegmentCrossInnerTriangle();
         if(res)
         {
             return Sign.POSITIVE;
@@ -414,12 +716,12 @@ public static class PointComputation
     // positive if a is in the interior of b, c, d; a,b,c,d must be coplanar
     public static Sign PointInInnerTriangle(IPointLocation a, IPointLocation b, IPointLocation c, IPointLocation d)
     {
-        Reset();
+        ResetPoints();
         AddPoint(a);
         AddPoint(b);
         AddPoint(c);
         AddPoint(d);
-        bool res = PointInInnerTriangle();
+        bool res = EvaluatePointInInnerTriangle();
         if(res)
         {
             return Sign.POSITIVE;
@@ -430,12 +732,12 @@ public static class PointComputation
     // positive if a is in b, c, d; a,b,c,d must be coplanar
     public static Sign PointInTriangle(IPointLocation a, IPointLocation b, IPointLocation c, IPointLocation d)
     {
-        Reset();
+        ResetPoints();
         AddPoint(a);
         AddPoint(b);
         AddPoint(c);
         AddPoint(d);
-        bool res = PointInTriangle();
+        bool res = EvaluatePointInTriangle();
         if(res)
         {
             return Sign.POSITIVE;
