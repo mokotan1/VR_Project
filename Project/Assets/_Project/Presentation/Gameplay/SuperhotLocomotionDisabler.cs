@@ -42,13 +42,13 @@ namespace VRProject.Presentation.Gameplay
                 return;
             }
 
-            foreach (var c in FindObjectsByType<ContinuousMoveProvider>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+            foreach (var c in FindObjectsByType<ContinuousMoveProvider>(FindObjectsInactive.Include))
                 c.enabled = false;
-            foreach (var t in FindObjectsByType<TeleportationProvider>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+            foreach (var t in FindObjectsByType<TeleportationProvider>(FindObjectsInactive.Include))
                 t.enabled = false;
-            foreach (var s in FindObjectsByType<SnapTurnProvider>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+            foreach (var s in FindObjectsByType<SnapTurnProvider>(FindObjectsInactive.Include))
                 s.enabled = false;
-            foreach (var ct in FindObjectsByType<ContinuousTurnProvider>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+            foreach (var ct in FindObjectsByType<ContinuousTurnProvider>(FindObjectsInactive.Include))
                 ct.enabled = false;
         }
     }

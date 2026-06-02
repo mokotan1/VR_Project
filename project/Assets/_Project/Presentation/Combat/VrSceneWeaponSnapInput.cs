@@ -25,13 +25,37 @@ namespace VRProject.Presentation.Combat
 
         void Update()
         {
-            if (_triggerDetector.Tick(IsPickupPressed(), out _triggerDetector))
-                SnapSceneWeaponsToRightFront();
+            if (!_triggerDetector.Tick(IsPickupPressed(), out _triggerDetector))
+                return;
+
+            if (TryReleaseSnappedWeapons())
+                return;
+
+            SnapSceneWeaponsToRightFront();
         }
 
         public void Bind(XROrigin xrOrigin)
         {
             _xrOrigin = xrOrigin;
+        }
+
+        public bool TryReleaseSnappedWeapons()
+        {
+            var anchor = ResolveRightHandAnchor();
+            if (anchor == null)
+                return false;
+
+            var released = false;
+            foreach (var weaponRoot in FindSceneWeaponRoots())
+            {
+                if (weaponRoot == null || weaponRoot.parent != anchor)
+                    continue;
+
+                ReleaseSnappedWeapon(weaponRoot);
+                released = true;
+            }
+
+            return released;
         }
 
         public void SnapSceneWeaponsToRightFront()
@@ -101,7 +125,8 @@ namespace VRProject.Presentation.Combat
             weaponRoot.localPosition = localOffset;
             weaponRoot.localRotation = Quaternion.identity;
 
-            SceneMeleeWeaponSetup.Ensure(weaponRoot.gameObject, _sceneMeleeProfile);
+            var profile = ResolveMeleeProfile(weaponRoot.gameObject);
+            SceneMeleeWeaponSetup.Ensure(weaponRoot.gameObject, profile);
             TryAlignMeleeBladeTowardViewCenter(weaponRoot, anchor, localOffset);
 
             var binder = weaponRoot.GetComponent<MeleeWeaponRuntimeBinder>();
@@ -116,6 +141,8 @@ namespace VRProject.Presentation.Combat
             if (vrSource != null)
                 vrSource.NotifyHeldForVrSnap();
 
+            EnsureGrabLifecycle(weaponRoot.gameObject);
+
             var rb = weaponRoot.GetComponent<Rigidbody>();
             if (rb == null)
                 return;
@@ -123,6 +150,17 @@ namespace VRProject.Presentation.Combat
             rb.linearVelocity = Vector3.zero;
             rb.angularVelocity = Vector3.zero;
             rb.isKinematic = true;
+        }
+
+        static void ReleaseSnappedWeapon(Transform weaponRoot)
+        {
+            weaponRoot.GetComponent<MeleeWeaponVrGrabLifecycle>()?.ReleaseFromHandSnap();
+        }
+
+        static void EnsureGrabLifecycle(GameObject weaponRoot)
+        {
+            if (weaponRoot.GetComponent<MeleeWeaponVrGrabLifecycle>() == null)
+                weaponRoot.AddComponent<MeleeWeaponVrGrabLifecycle>();
         }
 
         Transform ResolveRightHandAnchor()
@@ -167,6 +205,18 @@ namespace VRProject.Presentation.Combat
             weaponRoot.localRotation = localRotation;
         }
 
+        WeaponAttackProfile ResolveMeleeProfile(GameObject weaponRoot)
+        {
+            if (_sceneMeleeProfile != null)
+                return _sceneMeleeProfile;
+
+            var source = weaponRoot.GetComponent<SceneMeleeWeaponProfileSource>();
+            if (source != null && source.Profile != null)
+                return source.Profile;
+
+            return null;
+        }
+
         static bool IsMeleeSnapTarget(Transform weaponRoot)
         {
             if (weaponRoot == null)
@@ -175,17 +225,17 @@ namespace VRProject.Presentation.Combat
             if (weaponRoot.GetComponent<MeleeWeaponRuntimeBinder>() != null)
                 return true;
 
-            return IsSceneAxeRoot(weaponRoot);
+            return IsSceneAxeRoot(weaponRoot) || IsSceneGunRoot(weaponRoot);
         }
 
         static Transform[] FindSceneWeaponRoots()
         {
             var results = new System.Collections.Generic.List<Transform>();
 
-            foreach (var melee in UnityEngine.Object.FindObjectsByType<MeleeWeaponRuntimeBinder>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+            foreach (var melee in UnityEngine.Object.FindObjectsByType<MeleeWeaponRuntimeBinder>(FindObjectsInactive.Include))
                 AddUnique(results, melee.transform);
 
-            foreach (var transform in UnityEngine.Object.FindObjectsByType<Transform>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+            foreach (var transform in UnityEngine.Object.FindObjectsByType<Transform>(FindObjectsInactive.Include))
             {
                 if (IsSceneGunRoot(transform) || IsSceneAxeRoot(transform))
                     AddUnique(results, transform);

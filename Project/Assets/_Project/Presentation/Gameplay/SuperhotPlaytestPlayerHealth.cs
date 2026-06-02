@@ -9,7 +9,7 @@ namespace VRProject.Presentation.Gameplay
     [DisallowMultipleComponent]
     public sealed class SuperhotPlaytestPlayerHealth : MonoBehaviour
     {
-        [SerializeField] int _startingHits = 3;
+        [SerializeField] int _startingHits = 1;
 
         int _hitsTaken;
 

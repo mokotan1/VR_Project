@@ -43,9 +43,7 @@ namespace VRProject.Presentation.Gameplay
 
         float ComputeHighestThreat()
         {
-            var enemies = FindObjectsByType<CrystalDefenseEnemyObjective>(
-                FindObjectsInactive.Exclude,
-                FindObjectsSortMode.None);
+            var enemies = FindObjectsByType<CrystalDefenseEnemyObjective>(FindObjectsInactive.Exclude);
 
             var highest = 0f;
             foreach (var enemy in enemies)

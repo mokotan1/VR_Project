@@ -41,9 +41,7 @@ namespace VRProject.Presentation.Gameplay
             if (_crystal == null)
                 return;
 
-            var objectives = FindObjectsByType<CrystalDefenseEnemyObjective>(
-                FindObjectsInactive.Exclude,
-                FindObjectsSortMode.None);
+            var objectives = FindObjectsByType<CrystalDefenseEnemyObjective>(FindObjectsInactive.Exclude);
 
             foreach (var objective in objectives)
             {

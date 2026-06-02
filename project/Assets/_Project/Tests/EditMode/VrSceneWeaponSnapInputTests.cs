@@ -1,6 +1,7 @@
 using NUnit.Framework;
 using Unity.XR.CoreUtils;
 using UnityEngine;
+using UnityEngine.XR.Interaction.Toolkit.Interactables;
 using VRProject.Presentation.Combat;
 
 namespace VRProject.Tests.EditMode
@@ -35,9 +36,11 @@ namespace VRProject.Tests.EditMode
             _rightController.transform.SetParent(_xrObject.transform, false);
             _rightController.transform.SetPositionAndRotation(new Vector3(1f, 2f, 3f), Quaternion.identity);
 
-            _gun = new GameObject("WeaponPickup_HK416");
+            _gun = CreateHk416PickupRoot();
             _axe = new GameObject("MeleeWeapon_Axe");
             _axe.AddComponent<MeleeWeaponRuntimeBinder>();
+            _axe.AddComponent<MeleeWeaponVrGrabLifecycle>();
+            _axe.AddComponent<XRGrabInteractable>();
             _axe.AddComponent<WeaponMotionSourceRouter>();
             var flatSource = _axe.AddComponent<FlatMouseWeaponMotionSource>();
             var vrSource = _axe.AddComponent<VrGrabbedWeaponMotionSource>();
@@ -52,6 +55,10 @@ namespace VRProject.Tests.EditMode
             snapInput.Bind(origin);
 
             snapInput.SnapSceneWeaponsToRightFront();
+
+            Assert.IsNotNull(_gun.GetComponent<WeaponHitDetector>());
+            Assert.IsNotNull(_gun.GetComponent<XRGrabInteractable>());
+            Assert.IsNotNull(_gun.GetComponent<MeleeWeaponVrGrabLifecycle>());
 
             var firstSlot = new Vector3(1.32f, 1.88f, 3.55f);
             var secondSlot = new Vector3(1.32f, 1.70f, 3.47f);
@@ -71,6 +78,38 @@ namespace VRProject.Tests.EditMode
         {
             return Vector3.Distance(actual, firstSlot) < 0.001f ||
                    Vector3.Distance(actual, secondSlot) < 0.001f;
+        }
+
+        static GameObject CreateHk416PickupRoot()
+        {
+            var root = new GameObject("WeaponPickup_HK416");
+            var visual = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            visual.name = "PickupVisual_HK416";
+            visual.transform.SetParent(root.transform, false);
+            visual.transform.localScale = new Vector3(0.08f, 0.12f, 0.85f);
+            Object.DestroyImmediate(visual.GetComponent<BoxCollider>());
+            return root;
+        }
+
+        [Test]
+        public void TryReleaseSnappedWeapons_UnparentsWeaponFromRightController()
+        {
+            _xrObject = new GameObject("XR Origin (XR Rig)");
+            var origin = _xrObject.AddComponent<XROrigin>();
+            _rightController = new GameObject("Right Controller");
+            _rightController.transform.SetParent(_xrObject.transform, false);
+
+            _axe = new GameObject("MeleeWeapon_Axe");
+            _axe.AddComponent<Rigidbody>();
+            _axe.AddComponent<XRGrabInteractable>();
+            _axe.AddComponent<MeleeWeaponVrGrabLifecycle>();
+            _axe.transform.SetParent(_rightController.transform, false);
+
+            var snapInput = _xrObject.AddComponent<VrSceneWeaponSnapInput>();
+            snapInput.Bind(origin);
+
+            Assert.IsTrue(snapInput.TryReleaseSnappedWeapons());
+            Assert.IsNull(_axe.transform.parent);
         }
 
         [Test]

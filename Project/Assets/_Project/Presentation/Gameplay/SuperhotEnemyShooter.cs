@@ -6,8 +6,10 @@ using VRProject.Infrastructure.DI;
 namespace VRProject.Presentation.Gameplay
 {
     /// <summary>
-    /// Periodically spawns projectiles toward the HMD. Interval uses simulation time when clock is available.
+    /// Periodically spawns projectiles toward the HMD. Cadence follows <see cref="IGameplayClock.SimulationDeltaTime"/>
+    /// so fire rate and in-flight bullets respect SUPERHOT time smoothing when the player is still.
     /// </summary>
+    [DefaultExecutionOrder(0)]
     [DisallowMultipleComponent]
     public sealed class SuperhotEnemyShooter : MonoBehaviour
     {
@@ -19,9 +21,9 @@ namespace VRProject.Presentation.Gameplay
 
         [SerializeField] float _cooldownSeconds = 2.5f;
 
-        [Tooltip("켜면 쿨다운이 시뮬레이션 시간이 아니라 실시간(슬로모와 무관)으로 누적됩니다.")]
-        [SerializeField] bool _cooldownUsesRealTime;
+        [SerializeField] float _minEngagementDistance = 10f;
 
+        bool _rangedEngagementActive;
         float _accumulator;
         Unity.XR.CoreUtils.XROrigin _origin;
         IGameplayClock _clock;
@@ -41,31 +43,46 @@ namespace VRProject.Presentation.Gameplay
             _clock = locator.IsRegistered<IGameplayClock>() ? locator.Resolve<IGameplayClock>() : null;
         }
 
+        public void SetRangedEngagementActive(bool active) => _rangedEngagementActive = active;
+
         void Update()
         {
+            if (!_rangedEngagementActive)
+                return;
+
             RefreshPlayerTarget();
 
             if (_projectilePrefab == null || _hmd == null)
                 return;
 
-            float dt;
-            if (_cooldownUsesRealTime)
-                dt = Time.unscaledDeltaTime;
-            else
-                dt = _clock != null ? _clock.SimulationDeltaTime : Time.deltaTime;
+            var to = _hmd.position - (_muzzle != null ? _muzzle.position : transform.position);
+            if (to.sqrMagnitude < _minEngagementDistance * _minEngagementDistance)
+                return;
 
+            var dt = ResolveSimulationDeltaTime();
             _accumulator += dt;
             if (_accumulator < _cooldownSeconds)
                 return;
 
             _accumulator = 0f;
-            var origin = _muzzle.position;
-            var to = _hmd.position - origin;
+            var origin = _muzzle != null ? _muzzle.position : transform.position;
             if (to.sqrMagnitude < 1e-4f)
                 return;
 
             var proj = Instantiate(_projectilePrefab, origin, Quaternion.LookRotation(to.normalized));
             proj.Launch(to.normalized);
+        }
+
+        float ResolveSimulationDeltaTime()
+        {
+            if (_clock == null)
+            {
+                var locator = ServiceLocator.Instance;
+                if (locator.IsRegistered<IGameplayClock>())
+                    _clock = locator.Resolve<IGameplayClock>();
+            }
+
+            return _clock != null ? _clock.SimulationDeltaTime : Time.deltaTime;
         }
 
         void RefreshPlayerTarget()

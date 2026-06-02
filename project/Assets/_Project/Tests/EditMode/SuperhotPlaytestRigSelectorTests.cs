@@ -51,6 +51,7 @@ namespace VRProject.Tests.EditMode
             Assert.NotNull(_xrObject.GetComponent<SuperhotPlaytestPlayerHealth>());
             Assert.NotNull(_xrObject.GetComponent<PrototypeFpsPlayerHealth>());
             Assert.NotNull(_xrObject.GetComponent<VrSceneWeaponSnapInput>());
+            Assert.NotNull(_xrObject.GetComponent<PlaytestPlayerContactVolume>());
             Assert.IsNull(_rightController.transform.Find("XR_RuntimeGun"));
             Assert.IsFalse(_legacyPlayer.activeSelf);
         }

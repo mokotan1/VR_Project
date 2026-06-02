@@ -104,6 +104,12 @@ namespace VRProject.Presentation.Combat
             ConfigureBodyForHeldFlatOrMobile(false);
         }
 
+        /// <summary>Enables VR motion sampling while the weapon is held via <see cref="XRGrabInteractable"/>.</summary>
+        public void ActivateVrGrabbedHold()
+        {
+            ActivateVrSnappedHeldSource();
+        }
+
         void DisableSources()
         {
             SetActive(_vrSource, false);

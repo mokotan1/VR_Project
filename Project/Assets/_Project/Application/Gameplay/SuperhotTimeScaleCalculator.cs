@@ -1,4 +1,5 @@
 using System;
+using VRProject.Application.Combat;
 
 namespace VRProject.Application.Gameplay
 {
@@ -223,6 +224,50 @@ namespace VRProject.Application.Gameplay
             if (v < 0f)
                 return 0f;
             return v > 1f ? 1f : v;
+        }
+    }
+
+    /// <summary>
+    /// Pure helpers for manual NavMeshAgent sync when <c>updatePosition</c> is false.
+    /// </summary>
+    public static class NavMeshManualLocomotionLogic
+    {
+        public static CombatVector3 HorizontalMoveDelta(CombatVector3 desiredVelocity, float speedMetersPerSecond, float deltaTimeSeconds)
+        {
+            if (deltaTimeSeconds <= 0f || speedMetersPerSecond <= 0f)
+                return CombatVector3.Zero;
+
+            desiredVelocity = new CombatVector3(desiredVelocity.X, 0f, desiredVelocity.Z);
+            if (desiredVelocity.SqrMagnitude < 1e-6f)
+                return CombatVector3.Zero;
+
+            var step = speedMetersPerSecond * deltaTimeSeconds;
+            var n = desiredVelocity.Normalized;
+            return new CombatVector3(n.X * step, 0f, n.Z * step);
+        }
+
+        /// <summary>
+        /// Prefer steering target over <see cref="HorizontalMoveDelta"/> — desiredVelocity can carry vertical correction when agent internal Y drifts.
+        /// </summary>
+        public static CombatVector3 HorizontalMoveDeltaTowardSteering(
+            CombatVector3 worldPosition,
+            CombatVector3 steeringTarget,
+            float speedMetersPerSecond,
+            float deltaTimeSeconds)
+        {
+            if (deltaTimeSeconds <= 0f || speedMetersPerSecond <= 0f)
+                return CombatVector3.Zero;
+
+            var flatDir = new CombatVector3(
+                steeringTarget.X - worldPosition.X,
+                0f,
+                steeringTarget.Z - worldPosition.Z);
+            if (flatDir.SqrMagnitude < 1e-6f)
+                return CombatVector3.Zero;
+
+            var step = speedMetersPerSecond * deltaTimeSeconds;
+            var n = flatDir.Normalized;
+            return new CombatVector3(n.X * step, 0f, n.Z * step);
         }
     }
 }

@@ -19,6 +19,7 @@ namespace VRProject.EditorTools
         const string SwordProfilePath = ProfilesFolder + "/WeaponAttackProfile_Sword.asset";
         const string KnifeProfilePath = ProfilesFolder + "/WeaponAttackProfile_Knife.asset";
         const string BluntProfilePath = ProfilesFolder + "/WeaponAttackProfile_BluntHammer.asset";
+        const string RifleProfilePath = ProfilesFolder + "/WeaponAttackProfile_Rifle.asset";
         const string ShieldProfilePath = ProfilesFolder + "/WeaponAttackProfile_Shield.asset";
         const string SwordPrefabPath = PrefabsFolder + "/MeleeWeapon_Sword.prefab";
 
@@ -31,6 +32,7 @@ namespace VRProject.EditorTools
             CreateProfileIfMissing(SwordProfilePath, WeaponFamily.Hybrid, 1.5f, 0.6f, 0.5f);
             CreateProfileIfMissing(KnifeProfilePath, WeaponFamily.Stab, 1.2f, 0.75f, 0.35f);
             CreateProfileIfMissing(BluntProfilePath, WeaponFamily.Blunt, 1.8f, 0.35f, 0.25f);
+            CreateProfileIfMissing(RifleProfilePath, WeaponFamily.Blunt, 1.45f, 0.55f, 0.35f);
             CreateProfileIfMissing(ShieldProfilePath, WeaponFamily.Blunt, 1f, 0.2f, 0.2f);
 
             AssetDatabase.SaveAssets();
@@ -124,18 +126,23 @@ namespace VRProject.EditorTools
         public static void WireSceneMeleeWeaponsInOpenScene()
         {
             EnsureDefaultProfiles();
-            var profile = AssetDatabase.LoadAssetAtPath<WeaponAttackProfile>(
+            var axeProfile = AssetDatabase.LoadAssetAtPath<WeaponAttackProfile>(
                 ProfilesFolder + "/WeaponAttackProfile_Axe.asset");
-            if (profile == null)
+            var rifleProfile = AssetDatabase.LoadAssetAtPath<WeaponAttackProfile>(RifleProfilePath);
+            if (axeProfile == null && rifleProfile == null)
             {
-                Debug.LogError("[VR Project] Missing WeaponAttackProfile_Axe asset.");
+                Debug.LogError("[VR Project] Missing WeaponAttackProfile_Axe and WeaponAttackProfile_Rifle assets.");
                 return;
             }
 
             var wired = 0;
-            foreach (var root in Object.FindObjectsByType<Transform>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+            foreach (var root in Object.FindObjectsByType<Transform>(FindObjectsInactive.Include))
             {
                 if (root == null || !IsSceneMeleeWeaponRoot(root))
+                    continue;
+
+                var profile = ResolveSceneMeleeProfile(root.gameObject, axeProfile, rifleProfile);
+                if (profile == null)
                     continue;
 
                 if (SceneMeleeWeaponSetup.Ensure(root.gameObject, profile))
@@ -146,10 +153,128 @@ namespace VRProject.EditorTools
             Debug.Log($"[VR Project] Wired scene melee combat stack on {wired} weapon(s).");
         }
 
+        static WeaponAttackProfile ResolveSceneMeleeProfile(
+            GameObject weaponRoot,
+            WeaponAttackProfile axeProfile,
+            WeaponAttackProfile rifleProfile)
+        {
+            var source = weaponRoot.GetComponent<SceneMeleeWeaponProfileSource>();
+            if (source != null && source.Profile != null)
+                return source.Profile;
+
+            return SceneMeleeWeaponSetup.IsHk416WeaponRoot(weaponRoot) ? rifleProfile : axeProfile;
+        }
+
+        [MenuItem("VR Project/Combat/Repair Miswired HK416 Melee Stack In Open Scene")]
+        public static void RepairMiswiredHk416MeleeStackInOpenScene()
+        {
+            var repaired = SceneMeleeWeaponSetup.RepairMiswiredMeleeStacks(root =>
+            {
+                RestorePlaytestPlayerPhysicsIfNeeded(root);
+                EditorUtility.SetDirty(root);
+            });
+
+            EditorSceneManager.MarkSceneDirty(EditorSceneManager.GetActiveScene());
+            Debug.Log(
+                $"[VR Project] Repaired miswired HK416 melee stack on {repaired} object(s). " +
+                "Save the scene, then re-run Wire HK416 if needed.");
+        }
+
+        [MenuItem("VR Project/Combat/Repair NavWorld After HK416 Wire Bug")]
+        public static void RepairNavWorldAfterHk416WireBug() => RepairMiswiredHk416MeleeStackInOpenScene();
+
+        static void RestorePlaytestPlayerPhysicsIfNeeded(GameObject root)
+        {
+            if (root == null)
+                return;
+
+            if (root.name == "UnityChan_Player" ||
+                root.GetComponent<PlaytestPlayerContactVolume>() != null ||
+                root.GetComponent<Unity.XR.CoreUtils.XROrigin>() != null)
+            {
+                PlaytestPlayerContactVolume.Ensure(root);
+            }
+        }
+
+        [MenuItem("VR Project/Combat/Wire HK416 Melee Pickup In Open Scene")]
+        public static void WireHk416MeleePickupInOpenScene()
+        {
+            EnsureDefaultProfiles();
+            var rifleProfile = AssetDatabase.LoadAssetAtPath<WeaponAttackProfile>(RifleProfilePath);
+            if (rifleProfile == null)
+            {
+                Debug.LogError("[VR Project] Missing WeaponAttackProfile_Rifle asset.");
+                return;
+            }
+
+            RepairMiswiredHk416MeleeStackInOpenScene();
+
+            var wired = 0;
+            var seen = new System.Collections.Generic.HashSet<GameObject>();
+            foreach (var weaponRoot in FindHk416FloorPickupRoots())
+            {
+                if (weaponRoot == null || !seen.Add(weaponRoot))
+                    continue;
+
+                WireHk416FloorPickup(weaponRoot, rifleProfile);
+                wired++;
+            }
+
+            EditorSceneManager.MarkSceneDirty(EditorSceneManager.GetActiveScene());
+            Debug.Log($"[VR Project] Wired HK416 melee pickup on {wired} weapon(s).");
+        }
+
+        static System.Collections.Generic.IEnumerable<GameObject> FindHk416FloorPickupRoots()
+        {
+            foreach (var transform in Object.FindObjectsByType<Transform>(FindObjectsInactive.Include))
+            {
+                if (transform == null)
+                    continue;
+
+                if (transform.name == "WeaponPickup_HK416")
+                {
+                    yield return transform.gameObject;
+                    continue;
+                }
+
+                if (transform.name == "PickupVisual_HK416" && transform.parent != null)
+                    yield return transform.parent.gameObject;
+            }
+        }
+
+        static void WireHk416FloorPickup(GameObject weaponRoot, WeaponAttackProfile rifleProfile)
+        {
+            var source = weaponRoot.GetComponent<SceneMeleeWeaponProfileSource>();
+            if (source == null)
+                source = weaponRoot.AddComponent<SceneMeleeWeaponProfileSource>();
+            source.SetProfile(rifleProfile);
+
+            if (weaponRoot.GetComponent<SceneMeleeWeaponAutoSetup>() == null)
+                weaponRoot.AddComponent<SceneMeleeWeaponAutoSetup>();
+
+            UnityEngine.Object.DestroyImmediate(weaponRoot.GetComponent<VRProject.Presentation.PrototypeFps.PrototypeFpsWeaponPickup>());
+
+            var legacySphere = weaponRoot.GetComponent<SphereCollider>();
+            if (legacySphere != null)
+                UnityEngine.Object.DestroyImmediate(legacySphere);
+
+            SceneMeleeWeaponSetup.Ensure(weaponRoot, rifleProfile);
+            EditorUtility.SetDirty(weaponRoot);
+        }
+
         static bool IsSceneMeleeWeaponRoot(Transform transform)
         {
             var name = transform.name;
-            return name.Contains("Axe") || name.Contains("MeleeWeapon");
+            return name.Contains("Axe") ||
+                   name.Contains("MeleeWeapon") ||
+                   SceneMeleeWeaponSetup.IsHk416WeaponRoot(transform.gameObject);
+        }
+
+        [MenuItem("VR Project/Combat/Repair Enemy Projectile Prefab")]
+        public static void RepairEnemyProjectilePrefab()
+        {
+            EnemyProjectilePrefabUtility.EnsurePrefab();
+            Debug.Log("[VR Project] Repaired SuperhotProjectile prefab material.");
         }
 
         [MenuItem("VR Project/Combat/Wire Enemy Melee Hit Zones In Open Scene")]
@@ -161,15 +286,47 @@ namespace VRProject.EditorTools
                 return;
             }
 
+            WireAllEnemiesInOpenScene(saveScene: true);
+        }
+
+        [MenuItem("VR Project/Combat/Wire Playtest Ranged On All Enemies (UnityChan Scene)")]
+        public static void WirePlaytestRangedOnAllEnemiesInUnityChanScene()
+        {
+            EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+            WireAllEnemiesInOpenScene(saveScene: true);
+        }
+
+        /// <summary>BatchMode entry: opens UnityChan scene, wires melee+ranged playtest tuning, saves.</summary>
+        public static void BatchWirePlaytestRangedInUnityChanScene()
+        {
+            WirePlaytestRangedOnAllEnemiesInUnityChanScene();
+        }
+
+        static void WireAllEnemiesInOpenScene(bool saveScene)
+        {
             var wired = 0;
-            foreach (var brain in Object.FindObjectsByType<SuperhotEnemyBrain>(FindObjectsSortMode.None))
+            foreach (var brain in Object.FindObjectsByType<SuperhotEnemyBrain>(FindObjectsInactive.Include))
             {
                 if (MeleeEnemySetup.Ensure(brain.gameObject))
                     wired++;
             }
 
+            if (saveScene)
+                EditorSceneManager.SaveOpenScenes();
+
             EditorSceneManager.MarkSceneDirty(EditorSceneManager.GetActiveScene());
-            Debug.Log($"[VR Project] Wired melee hit zones on {wired} enemy agent(s).");
+            if (wired == 0)
+            {
+                Debug.LogWarning(
+                    "[VR Project] No SuperhotEnemyBrain found (including inactive). " +
+                    "Spawn enemies in UnityChanPrototypeFps or enable inactive Enemy_Agent objects.");
+            }
+            else
+            {
+                Debug.Log(
+                    $"[VR Project] Wired melee + playtest ranged combat on {wired} enemy agent(s). " +
+                    $"Ranged band >{MeleeEnemySetup.PlaytestRangedMinDistance}m, cooldown {MeleeEnemySetup.PlaytestRangedCooldownSeconds}s.");
+            }
         }
 
         static bool IsUnityChanSceneOpen()
@@ -188,6 +345,12 @@ namespace VRProject.EditorTools
 
             var grab = instance.GetComponent<XRGrabInteractable>();
             ConfigureGrabInteractable(grab);
+
+            if (instance.GetComponent<MeleeWeaponVrGrabLifecycle>() == null)
+                instance.AddComponent<MeleeWeaponVrGrabLifecycle>();
+
+            if (grab != null)
+                MeleeWeaponGrabColliderUtility.RefreshGrabColliders(grab);
         }
 
         static void CreateProfileIfMissing(string path, WeaponFamily family, float enterLinear, float stabDot, float slashDot)
@@ -219,6 +382,7 @@ namespace VRProject.EditorTools
             root.AddComponent<FlatMouseWeaponMotionSource>();
             root.AddComponent<MobileTouchWeaponMotionSource>();
             root.AddComponent<MeleeWeaponRuntimeBinder>();
+            root.AddComponent<MeleeWeaponVrGrabLifecycle>();
 
             var handle = new GameObject("Handle").transform;
             handle.SetParent(root.transform, false);
@@ -358,6 +522,10 @@ namespace VRProject.EditorTools
 
     public static class MeleeEnemySetup
     {
+        /// <summary>Playtest: enter ranged band sooner and fire faster than default combat tuning.</summary>
+        public const float PlaytestRangedMinDistance = 7f;
+        public const float PlaytestRangedCooldownSeconds = 0.75f;
+
         public static bool Ensure(GameObject enemyRoot)
         {
             if (enemyRoot == null)
@@ -373,10 +541,94 @@ namespace VRProject.EditorTools
             WireGlassShardPrefab(enemyRoot);
 
             var changed = false;
+            changed |= EnsureMeleeAttack(enemyRoot);
+            changed |= EnsureRangedAttack(enemyRoot);
+            changed |= EnsureBrainPlaytestRangedTuning(enemyRoot);
             changed |= EnsureZone(enemyRoot.transform, "HitZone_Head", HitZoneKind.Head, new Vector3(0f, 1.55f, 0f), new Vector3(0.35f, 0.35f, 0.35f), 1.5f);
             changed |= EnsureZone(enemyRoot.transform, "HitZone_Torso", HitZoneKind.Torso, new Vector3(0f, 0.95f, 0f), new Vector3(0.55f, 0.75f, 0.35f), 1f);
             changed |= EnsureZone(enemyRoot.transform, "HitZone_Limb", HitZoneKind.Limb, new Vector3(0.35f, 0.55f, 0f), new Vector3(0.25f, 0.55f, 0.25f), 0.85f);
             return true;
+        }
+
+        static bool EnsureMeleeAttack(GameObject enemyRoot)
+        {
+            var controller = enemyRoot.GetComponent<EnemyMeleeAttackController>();
+            if (controller == null)
+                controller = enemyRoot.AddComponent<EnemyMeleeAttackController>();
+
+            EnsureKinematicRigidbody(enemyRoot);
+
+            var hitboxTransform = enemyRoot.transform.Find("MeleeHitbox");
+            EnemyMeleeHitbox hitbox;
+            if (hitboxTransform == null)
+            {
+                var hitboxGo = new GameObject("MeleeHitbox");
+                hitboxGo.transform.SetParent(enemyRoot.transform, false);
+                hitboxGo.transform.localPosition = new Vector3(0f, 1f, 0.55f);
+                var box = hitboxGo.AddComponent<BoxCollider>();
+                box.isTrigger = true;
+                box.size = new Vector3(0.9f, 0.9f, 1.1f);
+                hitbox = hitboxGo.AddComponent<EnemyMeleeHitbox>();
+            }
+            else
+            {
+                hitbox = hitboxTransform.GetComponent<EnemyMeleeHitbox>();
+                if (hitbox == null)
+                    hitbox = hitboxTransform.gameObject.AddComponent<EnemyMeleeHitbox>();
+            }
+
+            var so = new SerializedObject(controller);
+            so.FindProperty("_hitbox").objectReferenceValue = hitbox;
+            so.ApplyModifiedPropertiesWithoutUndo();
+            return controller != null;
+        }
+
+        static bool EnsureRangedAttack(GameObject enemyRoot)
+        {
+            var shooter = enemyRoot.GetComponent<SuperhotEnemyShooter>();
+            if (shooter == null)
+                shooter = enemyRoot.AddComponent<SuperhotEnemyShooter>();
+
+            shooter.enabled = false;
+
+            var muzzleTransform = enemyRoot.transform.Find("RangedMuzzle");
+            if (muzzleTransform == null)
+            {
+                var muzzleGo = new GameObject("RangedMuzzle");
+                muzzleGo.transform.SetParent(enemyRoot.transform, false);
+                muzzleGo.transform.localPosition = new Vector3(0f, 1.4f, 0.35f);
+                muzzleTransform = muzzleGo.transform;
+            }
+
+            var prefab = EnemyProjectilePrefabUtility.EnsurePrefab();
+            var so = new SerializedObject(shooter);
+            so.FindProperty("_projectilePrefab").objectReferenceValue = prefab;
+            so.FindProperty("_muzzle").objectReferenceValue = muzzleTransform;
+            so.FindProperty("_minEngagementDistance").floatValue = PlaytestRangedMinDistance;
+            so.FindProperty("_cooldownSeconds").floatValue = PlaytestRangedCooldownSeconds;
+            so.ApplyModifiedPropertiesWithoutUndo();
+            return shooter != null;
+        }
+
+        static bool EnsureBrainPlaytestRangedTuning(GameObject enemyRoot)
+        {
+            var brain = enemyRoot.GetComponent<SuperhotEnemyBrain>();
+            if (brain == null)
+                return false;
+
+            var so = new SerializedObject(brain);
+            so.FindProperty("_rangedAttackMinDistance").floatValue = PlaytestRangedMinDistance;
+            so.ApplyModifiedPropertiesWithoutUndo();
+            return true;
+        }
+
+        static void EnsureKinematicRigidbody(GameObject enemyRoot)
+        {
+            var rb = enemyRoot.GetComponent<Rigidbody>();
+            if (rb == null)
+                rb = enemyRoot.AddComponent<Rigidbody>();
+            rb.isKinematic = true;
+            rb.useGravity = false;
         }
 
         const string GlassShardBurstPrefabPath = "Assets/GlassShards/Prefabs/GlassShardBurst.prefab";

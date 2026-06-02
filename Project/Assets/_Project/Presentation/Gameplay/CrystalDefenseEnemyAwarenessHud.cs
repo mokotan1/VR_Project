@@ -34,9 +34,7 @@ namespace VRProject.Presentation.Gameplay
             if (_camera == null || _indicatorRoot == null)
                 return;
 
-            var enemies = FindObjectsByType<CrystalDefenseEnemyObjective>(
-                FindObjectsInactive.Exclude,
-                FindObjectsSortMode.None);
+            var enemies = FindObjectsByType<CrystalDefenseEnemyObjective>(FindObjectsInactive.Exclude);
 
             var used = 0;
             var canvasSize = _indicatorRoot.rect.size;

@@ -158,10 +158,7 @@ namespace VRProject.EditorTools
             if (type == null)
                 return null;
 
-            var objects = UnityEngine.Object.FindObjectsByType(
-                type,
-                FindObjectsInactive.Include,
-                FindObjectsSortMode.None);
+            var objects = UnityEngine.Object.FindObjectsByType(type, FindObjectsInactive.Include);
             return objects.Length > 0 ? objects[0] as Component : null;
         }
 

@@ -39,7 +39,7 @@ namespace VRProject.Presentation.Common.UI
         void Awake()
         {
             if (_driver == null)
-                _driver = FindFirstObjectByType<SuperhotGameplayDriver>();
+                _driver = FindAnyObjectByType<SuperhotGameplayDriver>();
         }
 
         void OnEnable()  => _visible = _visibleOnStart;
@@ -156,7 +156,7 @@ namespace VRProject.Presentation.Common.UI
             if (Time.unscaledTime < _nextEnemyRescanUnscaled)
                 return;
             _nextEnemyRescanUnscaled = Time.unscaledTime + Mathf.Max(0.05f, _enemyBrainRescanInterval);
-            _enemyBrains = FindObjectsByType<SuperhotEnemyBrain>(FindObjectsInactive.Include, FindObjectsSortMode.InstanceID);
+            _enemyBrains = FindObjectsByType<SuperhotEnemyBrain>(FindObjectsInactive.Include);
             Array.Sort(_enemyBrains, (a, b) => string.CompareOrdinal(a.name, b.name));
         }
 

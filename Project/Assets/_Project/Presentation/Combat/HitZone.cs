@@ -10,7 +10,7 @@ namespace VRProject.Presentation.Combat
 
         public HitZoneKind Kind => _kind;
         public float FeedbackMultiplier => _feedbackMultiplier;
-        public int ZoneId => GetInstanceID();
+        public int ZoneId => gameObject.GetHashCode();
 
         public static HitZone Resolve(Collider collider)
         {

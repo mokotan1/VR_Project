@@ -1,4 +1,5 @@
 using NUnit.Framework;
+using VRProject.Application.Combat;
 using VRProject.Application.Gameplay;
 
 namespace VRProject.Tests.EditMode
@@ -187,6 +188,45 @@ namespace VRProject.Tests.EditMode
                 var maxB = SuperhotTimeScaleCalculator.DesktopMaxBlendedTargetTimeScale(min, max, m, l, mw, lw);
                 Assert.AreEqual(add, maxB, 1e-4f, $"m={m} l={l} mw={mw} lw={lw}");
             }
+        }
+
+        [Test]
+        public void HorizontalMoveDelta_IgnoresVerticalDesiredVelocity()
+        {
+            var delta = NavMeshManualLocomotionLogic.HorizontalMoveDelta(
+                new CombatVector3(1f, 4f, 0f),
+                speedMetersPerSecond: 2f,
+                deltaTimeSeconds: 0.5f);
+
+            Assert.AreEqual(1f, delta.X, 1e-4f);
+            Assert.AreEqual(0f, delta.Y, 1e-4f);
+            Assert.AreEqual(0f, delta.Z, 1e-4f);
+        }
+
+        [Test]
+        public void HorizontalMoveDelta_ReturnsZeroWhenDesiredVelocityIsVerticalOnly()
+        {
+            var delta = NavMeshManualLocomotionLogic.HorizontalMoveDelta(
+                new CombatVector3(0f, 1f, 0f),
+                speedMetersPerSecond: 2f,
+                deltaTimeSeconds: 0.5f);
+
+            Assert.AreEqual(CombatVector3.Zero, delta);
+        }
+
+        [Test]
+        public void HorizontalMoveDeltaTowardSteering_IgnoresSteeringTargetHeight()
+        {
+            var delta = NavMeshManualLocomotionLogic.HorizontalMoveDeltaTowardSteering(
+                new CombatVector3(0f, 0f, 0f),
+                new CombatVector3(3f, 12f, 4f),
+                speedMetersPerSecond: 2f,
+                deltaTimeSeconds: 0.5f);
+
+            var expectedLen = 1f;
+            var actualLen = delta.Magnitude;
+            Assert.AreEqual(expectedLen, actualLen, 1e-4f);
+            Assert.AreEqual(0f, delta.Y, 1e-4f);
         }
     }
 }

@@ -939,33 +939,7 @@ namespace VRProject.EditorTools
             so.ApplyModifiedPropertiesWithoutUndo();
         }
 
-        static SuperhotProjectile EnsureProjectilePrefab()
-        {
-            var dir = System.IO.Path.GetDirectoryName(ProjectilePrefabPath);
-            if (!string.IsNullOrEmpty(dir) && !System.IO.Directory.Exists(dir))
-                System.IO.Directory.CreateDirectory(dir);
-
-            var existing = AssetDatabase.LoadAssetAtPath<SuperhotProjectile>(ProjectilePrefabPath);
-            if (existing != null)
-                return existing;
-
-            var projGo = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-            projGo.name = "SuperhotProjectile";
-            projGo.transform.localScale = Vector3.one * 0.12f;
-            UnityEngine.Object.DestroyImmediate(projGo.GetComponent<Collider>());
-            var sphere = projGo.AddComponent<SphereCollider>();
-            sphere.isTrigger = true;
-            var rb = projGo.AddComponent<Rigidbody>();
-            rb.isKinematic = true;
-            projGo.AddComponent<SuperhotProjectile>();
-            var pMat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
-            pMat.color = new Color(0.9f, 0.85f, 0.2f);
-            projGo.GetComponent<MeshRenderer>().sharedMaterial = pMat;
-
-            var prefab = PrefabUtility.SaveAsPrefabAsset(projGo, ProjectilePrefabPath);
-            UnityEngine.Object.DestroyImmediate(projGo);
-            return prefab.GetComponent<SuperhotProjectile>();
-        }
+        static SuperhotProjectile EnsureProjectilePrefab() => EnemyProjectilePrefabUtility.EnsurePrefab();
 
         static void AssignProjectileToZones(SuperhotCombatZone a, SuperhotCombatZone b, SuperhotProjectile prefab)
         {

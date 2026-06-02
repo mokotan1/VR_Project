@@ -34,6 +34,11 @@ namespace VRProject.Presentation.Combat
             _isSelected = true;
         }
 
+        public void ResetHeldForVrSnap()
+        {
+            _isSelected = false;
+        }
+
         void Awake()
         {
             _grab = GetComponent<XRGrabInteractable>();

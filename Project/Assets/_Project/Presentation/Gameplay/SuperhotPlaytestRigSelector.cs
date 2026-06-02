@@ -70,6 +70,11 @@ namespace VRProject.Presentation.Gameplay
             if (root.GetComponent<PrototypeFpsPlayerHealth>() == null)
                 root.AddComponent<PrototypeFpsPlayerHealth>();
 
+            if (root.GetComponent<PlaytestPlayerContactVolume>() == null)
+                root.AddComponent<PlaytestPlayerContactVolume>();
+            else
+                PlaytestPlayerContactVolume.Ensure(root);
+
             var snapInput = root.GetComponent<VrSceneWeaponSnapInput>();
             if (snapInput == null)
                 snapInput = root.AddComponent<VrSceneWeaponSnapInput>();
@@ -78,7 +83,7 @@ namespace VRProject.Presentation.Gameplay
 
         static void ApplyLegacyPlayerVisibility(bool useXr, XROrigin xrOrigin, SuperhotFlatPlaytestRig flatRig)
         {
-            var transforms = FindObjectsByType<Transform>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+            var transforms = FindObjectsByType<Transform>(FindObjectsInactive.Include);
             for (var i = 0; i < transforms.Length; i++)
             {
                 var candidate = transforms[i].gameObject;

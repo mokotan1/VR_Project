@@ -107,7 +107,7 @@ namespace VRProject.Presentation.Combat
                 }
             }
 
-            var targetId = receiver.GetInstanceID();
+            var targetId = receiver.GetHashCode();
             if (!_duplicateGuard.TryRegisterHit(
                     _session.CurrentSessionId,
                     targetId,

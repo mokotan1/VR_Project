@@ -9,6 +9,7 @@ namespace VRProject.Presentation.Gameplay
     /// Moves in a fixed direction using <see cref="IGameplayClock.SimulationDeltaTime"/>.
     /// 수명 옵션을 켠 경우 시뮬레이션 시간으로 누적합니다. 끄면 플레이어/카메라 등 기존 트리거에만 반응하며 벽 처리는 씬 콜라이더·태그 확장으로 추가할 수 있습니다.
     /// </summary>
+    [DefaultExecutionOrder(10)]
     [DisallowMultipleComponent]
     public sealed class SuperhotProjectile : MonoBehaviour
     {
@@ -39,7 +40,10 @@ namespace VRProject.Presentation.Gameplay
 
         void Update()
         {
-            var dt = _clock != null ? _clock.SimulationDeltaTime : Time.deltaTime;
+            var dt = ResolveSimulationDeltaTime();
+            if (dt <= 0f)
+                return;
+
             transform.position += _direction * (_speed * dt);
 
             if (_useLifetimeLimit)
@@ -48,6 +52,18 @@ namespace VRProject.Presentation.Gameplay
                 if (_age >= _lifetimeSeconds)
                     Destroy(gameObject);
             }
+        }
+
+        float ResolveSimulationDeltaTime()
+        {
+            if (_clock == null)
+            {
+                var locator = ServiceLocator.Instance;
+                if (locator.IsRegistered<IGameplayClock>())
+                    _clock = locator.Resolve<IGameplayClock>();
+            }
+
+            return _clock != null ? _clock.SimulationDeltaTime : Time.deltaTime;
         }
 
         void OnTriggerEnter(Collider other)

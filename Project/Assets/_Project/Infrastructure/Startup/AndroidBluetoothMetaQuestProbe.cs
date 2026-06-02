@@ -1,6 +1,7 @@
 #if UNITY_ANDROID && !UNITY_EDITOR
 using System;
 using UnityEngine;
+using UnityEngine.Android;
 using VRProject.Application.Startup;
 
 namespace VRProject.Infrastructure.Startup

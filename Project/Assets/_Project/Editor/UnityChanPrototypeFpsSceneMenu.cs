@@ -440,8 +440,9 @@ namespace VRProject.EditorTools
 
         static void MarkNavigationStatic(GameObject go)
         {
-            var flags = GameObjectUtility.GetStaticEditorFlags(go);
-            GameObjectUtility.SetStaticEditorFlags(go, flags | StaticEditorFlags.NavigationStatic);
+            if (go == null)
+                return;
+            // NavMeshSurface on NavWorld collects geometry under its hierarchy.
         }
 
         static void BuildCoverArena(Transform parent, Shader litShader)
@@ -567,7 +568,7 @@ namespace VRProject.EditorTools
                 if (enemyLayer >= 0)
                     SetLayerRecursively(root, enemyLayer);
 
-                root.SetActive(false);
+                root.SetActive(true);
             }
         }
 
@@ -640,6 +641,7 @@ namespace VRProject.EditorTools
 
             player.AddComponent<PrototypeMantleProbe>();
             AttachSharedUnityChanFpsGameplay(player, cam, litShader, fpsViewmodelUnderCamera: !handHeldWorldGun);
+            player.AddComponent<PlaytestPlayerContactVolume>();
 
             return player;
         }
@@ -1107,10 +1109,7 @@ namespace VRProject.EditorTools
             var pickupRoot = new GameObject("WeaponPickup_HK416");
             pickupRoot.transform.SetParent(parent, false);
             pickupRoot.transform.position = worldPosition;
-            var col = pickupRoot.AddComponent<SphereCollider>();
-            col.isTrigger = true;
-            col.radius = 0.95f;
-            pickupRoot.AddComponent<PrototypeFpsWeaponPickup>();
+            pickupRoot.transform.rotation = Quaternion.Euler(0f, 35f, 0f);
 
             var hk416 = TryInstantiatePrefabUnder(Hk416PrefabPath, pickupRoot.transform);
             if (hk416 != null)
@@ -1118,7 +1117,6 @@ namespace VRProject.EditorTools
                 if (PrefabUtility.IsPartOfPrefabInstance(hk416))
                     PrefabUtility.UnpackPrefabInstance(hk416, PrefabUnpackMode.Completely, InteractionMode.AutomatedAction);
                 hk416.name = "PickupVisual_HK416";
-                // Author demo uses ~0.1m lift and identity rotation; X=90 buried the mesh under the floor.
                 hk416.transform.localPosition = new Vector3(0f, 0.1f, 0f);
                 hk416.transform.localRotation = Quaternion.Euler(0f, 35f, 0f);
                 hk416.transform.localScale = Vector3.one;
@@ -1128,7 +1126,7 @@ namespace VRProject.EditorTools
             {
                 Debug.LogWarning("[VR Project] HK416 prefab missing at: " + Hk416PrefabPath + ". Using placeholder cube.");
                 var vis = GameObject.CreatePrimitive(PrimitiveType.Cube);
-                vis.name = "PickupVisual";
+                vis.name = "PickupVisual_HK416";
                 vis.transform.SetParent(pickupRoot.transform, false);
                 vis.transform.localPosition = Vector3.up * 0.12f;
                 vis.transform.localScale = new Vector3(0.22f, 0.08f, 0.42f);
@@ -1136,6 +1134,28 @@ namespace VRProject.EditorTools
                 vis.GetComponent<MeshRenderer>().sharedMaterial =
                     new Material(litShader) { color = new Color(0.22f, 0.55f, 0.28f) };
             }
+
+            WireHk416MeleePickup(pickupRoot);
+        }
+
+        static void WireHk416MeleePickup(GameObject pickupRoot)
+        {
+            MeleeCombatSceneMenu.EnsureDefaultProfiles();
+            var rifleProfile = AssetDatabase.LoadAssetAtPath<WeaponAttackProfile>(
+                "Assets/_Project/Presentation/Combat/Profiles/WeaponAttackProfile_Rifle.asset");
+
+            if (rifleProfile != null)
+            {
+                var source = pickupRoot.GetComponent<SceneMeleeWeaponProfileSource>();
+                if (source == null)
+                    source = pickupRoot.AddComponent<SceneMeleeWeaponProfileSource>();
+                source.SetProfile(rifleProfile);
+            }
+
+            if (pickupRoot.GetComponent<SceneMeleeWeaponAutoSetup>() == null)
+                pickupRoot.AddComponent<SceneMeleeWeaponAutoSetup>();
+
+            SceneMeleeWeaponSetup.Ensure(pickupRoot, rifleProfile);
         }
 
         static void SpawnBulletPackDecorations(Transform parent, Vector3 clusterOrigin)
