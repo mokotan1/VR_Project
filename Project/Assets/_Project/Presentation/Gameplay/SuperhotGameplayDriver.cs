@@ -3,6 +3,7 @@ using UnityEngine.XR;
 using VRProject.Application.Gameplay;
 using VRProject.Domain.Gameplay;
 using VRProject.Infrastructure.DI;
+using VRProject.Presentation.Combat;
 using VRProject.Presentation.OsFpsInspired;
 
 namespace VRProject.Presentation.Gameplay
@@ -141,6 +142,7 @@ namespace VRProject.Presentation.Gameplay
 
         [Tooltip("비어 있으면 씬에서 찾습니다.")]
         [SerializeField] SuperhotFlatHitscanWeapon _flatHitscanWeapon;
+        [SerializeField] VrHk416TriggerFire _vrHk416Fire;
 
         [Header("시간 느리게/빠르게 (기획에서 자주 조정)")]
         [Tooltip("입력이 거의 없을 때 목표 시간 배율(원작처럼 완전 0은 금지 — 아래 절대 하한 이상).")]
@@ -350,6 +352,9 @@ namespace VRProject.Presentation.Gameplay
                 blendedMotion01,
                 EffectiveMinTimeFactor(blendedMotion01),
                 _maxTimeFactor);
+            var vrFire = ResolveVrHk416Fire();
+            if (vrFire != null && vrFire.IsInShootTimeScaleHold)
+                targetFactor = _maxTimeFactor;
             FinishFrameWithSmoothedTarget(unscaledDt, targetFactor);
         }
 
@@ -662,6 +667,15 @@ namespace VRProject.Presentation.Gameplay
                 this);
         }
 #endif
+
+        VrHk416TriggerFire ResolveVrHk416Fire()
+        {
+            if (_vrHk416Fire != null && _vrHk416Fire.isActiveAndEnabled)
+                return _vrHk416Fire;
+
+            _vrHk416Fire = FindAnyObjectByType<VrHk416TriggerFire>(FindObjectsInactive.Include);
+            return _vrHk416Fire;
+        }
 
         void AutoWireIfNeeded()
         {

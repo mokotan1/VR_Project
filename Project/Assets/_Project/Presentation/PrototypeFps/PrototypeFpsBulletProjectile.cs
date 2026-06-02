@@ -19,9 +19,17 @@ namespace VRProject.Presentation.PrototypeFps
             _maxDistance = maxDistance;
             _spawnPosition = transform.position;
 
-            var dir = _direction;
+            transform.rotation = RotationForFlight(_direction, visualEulerOffset);
+        }
+
+        public static Quaternion RotationForFlight(Vector3 worldDirection, Vector3 visualEulerOffset)
+        {
+            var dir = worldDirection.sqrMagnitude > 1e-6f ? worldDirection.normalized : Vector3.forward;
             var up = Mathf.Abs(Vector3.Dot(dir, Vector3.up)) > 0.98f ? Vector3.right : Vector3.up;
-            transform.rotation = Quaternion.LookRotation(dir, up) * Quaternion.Euler(visualEulerOffset);
+            var align = Quaternion.LookRotation(dir, up);
+            return visualEulerOffset == Vector3.zero
+                ? align
+                : align * Quaternion.Euler(visualEulerOffset);
         }
 
         void Update()

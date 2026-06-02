@@ -15,7 +15,7 @@ namespace VRProject.Presentation.Combat
         [SerializeField] Vector3 _additionalWeaponStackOffset = new Vector3(0f, -0.18f, -0.08f);
         [SerializeField] WeaponAttackProfile _sceneMeleeProfile;
 
-        VrTriggerPressDetector _triggerDetector;
+        VrTriggerPressDetector _pickupDetector;
 
         void Awake()
         {
@@ -25,7 +25,21 @@ namespace VRProject.Presentation.Combat
 
         void Update()
         {
-            if (!_triggerDetector.Tick(IsPickupPressed(), out _triggerDetector))
+            ReadControllerFeatures(
+                _fireHand,
+                out var triggerButton,
+                out var triggerValue,
+                out var gripButton,
+                out var gripValue);
+
+            if (!_pickupDetector.Tick(
+                    IsControllerPickupPressed(
+                        triggerButton,
+                        triggerValue,
+                        gripButton,
+                        gripValue,
+                        _analogTriggerThreshold),
+                    out _pickupDetector))
                 return;
 
             if (TryReleaseSnappedWeapons())
@@ -58,6 +72,83 @@ namespace VRProject.Presentation.Combat
             return released;
         }
 
+        /// <summary>Snap the nearest floor <c>WeaponPickup_HK416</c> to the right hand (grip / G).</summary>
+        public bool TrySnapNearestHk416PickupToRightHand(float maxDistance)
+        {
+            var anchor = ResolveRightHandAnchor();
+            if (anchor == null)
+                return false;
+
+            if (HasHk416ChildOnAnchor(anchor))
+                return true;
+
+            Transform best = null;
+            var bestSqr = maxDistance * maxDistance;
+            foreach (var transform in UnityEngine.Object.FindObjectsByType<Transform>(FindObjectsInactive.Include))
+            {
+                if (transform == null || transform.name != "WeaponPickup_HK416")
+                    continue;
+
+                var sqr = (transform.position - anchor.position).sqrMagnitude;
+                if (sqr >= bestSqr)
+                    continue;
+
+                bestSqr = sqr;
+                best = transform;
+            }
+
+            if (best == null)
+                return false;
+
+            SnapHk416Pickup(best, anchor);
+            return true;
+        }
+
+        /// <summary>Release HK416 held on the right hand after grip is released.</summary>
+        public bool TryReleaseHk416FromRightHand()
+        {
+            var anchor = ResolveRightHandAnchor();
+            if (anchor == null)
+                return false;
+
+            var released = false;
+            foreach (var child in anchor.GetComponentsInChildren<Transform>(true))
+            {
+                if (child == null || child == anchor || child.name != "WeaponPickup_HK416")
+                    continue;
+
+                ReleaseSnappedWeapon(child);
+                released = true;
+            }
+
+            return released;
+        }
+
+        static bool HasHk416ChildOnAnchor(Transform anchor)
+        {
+            foreach (var child in anchor.GetComponentsInChildren<Transform>(true))
+            {
+                if (child == null || child == anchor)
+                    continue;
+
+                if (child.name == "WeaponPickup_HK416" || child.name == "HandGun_HK416")
+                    return true;
+            }
+
+            return false;
+        }
+
+        void SnapHk416Pickup(Transform weaponRoot, Transform anchor)
+        {
+            SnapWeapon(weaponRoot, anchor, 0);
+            SceneMeleeWeaponSetup.TrySanitizeTransform(weaponRoot);
+            SceneMeleeWeaponSetup.StripMiswiredAncestorGrabInteractables(weaponRoot.gameObject);
+
+            var router = weaponRoot.GetComponent<WeaponMotionSourceRouter>();
+            if (router != null)
+                router.ActivateVrSnappedHeldSource();
+        }
+
         public void SnapSceneWeaponsToRightFront()
         {
             var anchor = ResolveRightHandAnchor();
@@ -75,25 +166,35 @@ namespace VRProject.Presentation.Combat
             }
         }
 
-        bool IsPickupPressed()
+        public static void ReadControllerFeatures(
+            XRNode hand,
+            out bool triggerButton,
+            out float triggerValue,
+            out bool gripButton,
+            out float gripValue)
         {
-            if (IsEditorMousePickupPressed())
-                return true;
+            triggerButton = false;
+            triggerValue = 0f;
+            gripButton = false;
+            gripValue = 0f;
 
-            var device = InputDevices.GetDeviceAtXRNode(_fireHand);
+            var device = InputDevices.GetDeviceAtXRNode(hand);
             if (!device.isValid)
-                return false;
+                return;
 
-            device.TryGetFeatureValue(UnityEngine.XR.CommonUsages.triggerButton, out var triggerButton);
-            device.TryGetFeatureValue(UnityEngine.XR.CommonUsages.trigger, out var triggerValue);
-            device.TryGetFeatureValue(UnityEngine.XR.CommonUsages.gripButton, out var gripButton);
-            device.TryGetFeatureValue(UnityEngine.XR.CommonUsages.grip, out var gripValue);
-            return IsControllerPickupPressed(
-                triggerButton,
-                triggerValue,
-                gripButton,
-                gripValue,
-                _analogTriggerThreshold);
+            device.TryGetFeatureValue(UnityEngine.XR.CommonUsages.triggerButton, out triggerButton);
+            device.TryGetFeatureValue(UnityEngine.XR.CommonUsages.trigger, out triggerValue);
+            device.TryGetFeatureValue(UnityEngine.XR.CommonUsages.gripButton, out gripButton);
+            device.TryGetFeatureValue(UnityEngine.XR.CommonUsages.grip, out gripValue);
+        }
+
+        public Transform ResolveRightHandAnchor()
+        {
+            var root = _xrOrigin != null ? _xrOrigin.transform : transform;
+            var rightController = FindChildTransformByName(root, "Right Controller");
+            if (rightController != null)
+                return rightController;
+            return _xrOrigin != null && _xrOrigin.Camera != null ? _xrOrigin.Camera.transform : root;
         }
 
         static bool IsEditorMousePickupPressed()
@@ -110,13 +211,15 @@ namespace VRProject.Presentation.Combat
             float triggerValue,
             bool gripButton,
             float gripValue,
-            float analogThreshold)
-        {
-            if (triggerButton || triggerValue >= analogThreshold)
-                return true;
+            float analogThreshold) =>
+            IsControllerTriggerPressed(triggerButton, triggerValue, analogThreshold) ||
+            IsControllerGripPressed(gripButton, gripValue, analogThreshold);
 
-            return gripButton || gripValue >= analogThreshold;
-        }
+        public static bool IsControllerTriggerPressed(bool triggerButton, float triggerValue, float analogThreshold) =>
+            triggerButton || triggerValue >= analogThreshold;
+
+        public static bool IsControllerGripPressed(bool gripButton, float gripValue, float analogThreshold) =>
+            gripButton || gripValue >= analogThreshold;
 
         void SnapWeapon(Transform weaponRoot, Transform anchor, int stackIndex)
         {
@@ -124,6 +227,7 @@ namespace VRProject.Presentation.Combat
             weaponRoot.SetParent(anchor, false);
             weaponRoot.localPosition = localOffset;
             weaponRoot.localRotation = Quaternion.identity;
+            SceneMeleeWeaponSetup.TrySanitizeTransform(weaponRoot);
 
             var profile = ResolveMeleeProfile(weaponRoot.gameObject);
             SceneMeleeWeaponSetup.Ensure(weaponRoot.gameObject, profile);
@@ -161,15 +265,6 @@ namespace VRProject.Presentation.Combat
         {
             if (weaponRoot.GetComponent<MeleeWeaponVrGrabLifecycle>() == null)
                 weaponRoot.AddComponent<MeleeWeaponVrGrabLifecycle>();
-        }
-
-        Transform ResolveRightHandAnchor()
-        {
-            var root = _xrOrigin != null ? _xrOrigin.transform : transform;
-            var rightController = FindChildTransformByName(root, "Right Controller");
-            if (rightController != null)
-                return rightController;
-            return _xrOrigin != null && _xrOrigin.Camera != null ? _xrOrigin.Camera.transform : root;
         }
 
         Transform ResolveViewTransform()
@@ -225,7 +320,7 @@ namespace VRProject.Presentation.Combat
             if (weaponRoot.GetComponent<MeleeWeaponRuntimeBinder>() != null)
                 return true;
 
-            return IsSceneAxeRoot(weaponRoot) || IsSceneGunRoot(weaponRoot);
+            return IsSceneAxeRoot(weaponRoot);
         }
 
         static Transform[] FindSceneWeaponRoots()
@@ -233,23 +328,20 @@ namespace VRProject.Presentation.Combat
             var results = new System.Collections.Generic.List<Transform>();
 
             foreach (var melee in UnityEngine.Object.FindObjectsByType<MeleeWeaponRuntimeBinder>(FindObjectsInactive.Include))
+            {
+                if (SceneMeleeWeaponSetup.IsHk416WeaponRoot(melee.gameObject))
+                    continue;
+
                 AddUnique(results, melee.transform);
+            }
 
             foreach (var transform in UnityEngine.Object.FindObjectsByType<Transform>(FindObjectsInactive.Include))
             {
-                if (IsSceneGunRoot(transform) || IsSceneAxeRoot(transform))
+                if (IsSceneAxeRoot(transform))
                     AddUnique(results, transform);
             }
 
             return results.ToArray();
-        }
-
-        static bool IsSceneGunRoot(Transform transform)
-        {
-            var name = transform.name;
-            return name == "WeaponPickup_HK416" ||
-                   name == "PickupVisual_HK416" ||
-                   name == "HandGun_HK416";
         }
 
         static bool IsSceneAxeRoot(Transform transform)

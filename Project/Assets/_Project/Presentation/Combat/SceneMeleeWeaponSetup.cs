@@ -82,14 +82,69 @@ namespace VRProject.Presentation.Combat
             if (root == null || root.name != "NavWorld")
                 return false;
 
-            var transform = root.transform;
-            if (!IsCorruptTransform(transform))
+            return TrySanitizeTransform(root.transform, resetNavWorldOrigin: true);
+        }
+
+        /// <summary>Resets NaN/huge transforms that break culling (Invalid worldAABB).</summary>
+        public static bool TrySanitizeTransform(Transform transform, bool resetNavWorldOrigin = false)
+        {
+            if (transform == null || !IsCorruptTransform(transform))
                 return false;
 
-            transform.localPosition = Vector3.zero;
-            transform.localRotation = Quaternion.identity;
-            transform.localScale = Vector3.one;
+            if (resetNavWorldOrigin || transform.name == "NavWorld")
+            {
+                transform.localPosition = Vector3.zero;
+                transform.localRotation = Quaternion.identity;
+                transform.localScale = Vector3.one;
+                return true;
+            }
+
+            if (transform.localScale.sqrMagnitude < 1e-8f || !IsFiniteVector(transform.localScale))
+                transform.localScale = Vector3.one;
+
+            if (!IsFiniteVector(transform.localPosition))
+                transform.localPosition = Vector3.zero;
+
+            if (!IsFiniteQuaternion(transform.localRotation))
+                transform.localRotation = Quaternion.identity;
+
             return true;
+        }
+
+        /// <summary>
+        /// NavWorld/Floor must not keep <see cref="XRGrabInteractable"/> when a child pickup also grabs
+        /// (shared floor collider → duplicate XRI registration).
+        /// </summary>
+        public static bool StripMiswiredAncestorGrabInteractables(GameObject weaponRoot)
+        {
+            if (weaponRoot == null)
+                return false;
+
+            var stripped = false;
+            var parent = weaponRoot.transform.parent;
+            while (parent != null)
+            {
+                if (parent.name == "NavWorld" || parent.name == "Floor")
+                {
+                    var grab = parent.GetComponent<XRGrabInteractable>();
+                    if (grab != null)
+                    {
+                        grab.colliders.Clear();
+                        grab.enabled = false;
+                        stripped = true;
+                    }
+                }
+
+                parent = parent.parent;
+            }
+
+            return stripped;
+        }
+
+        static bool IsFiniteQuaternion(Quaternion value)
+        {
+            return float.IsFinite(value.x) && float.IsFinite(value.y) &&
+                   float.IsFinite(value.z) && float.IsFinite(value.w);
         }
 
         static bool IsCorruptTransform(Transform transform)
@@ -119,7 +174,8 @@ namespace VRProject.Presentation.Combat
                     continue;
 
                 var root = transform.gameObject;
-                if (TrySanitizeMiswiredRootTransform(root))
+                if (TrySanitizeMiswiredRootTransform(root) ||
+                    (IsHk416FloorPickupRoot(root) && TrySanitizeTransform(root.transform)))
                 {
                     onRootRepaired?.Invoke(root);
                     repaired++;
@@ -206,6 +262,7 @@ namespace VRProject.Presentation.Combat
                 return false;
             }
 
+            StripMiswiredAncestorGrabInteractables(weaponRoot);
             EnsureRigidbody(weaponRoot);
             EnsureGrabInteractable(weaponRoot);
             EnsureGrabLifecycle(weaponRoot);
@@ -323,11 +380,14 @@ namespace VRProject.Presentation.Combat
 
         static void EnsureGrabInteractable(GameObject weaponRoot)
         {
-            if (weaponRoot.GetComponent<XRGrabInteractable>() != null)
-                return;
+            var grab = weaponRoot.GetComponent<XRGrabInteractable>();
+            if (grab == null)
+            {
+                grab = weaponRoot.AddComponent<XRGrabInteractable>();
+                grab.movementType = XRBaseInteractable.MovementType.Kinematic;
+            }
 
-            var grab = weaponRoot.AddComponent<XRGrabInteractable>();
-            grab.movementType = XRBaseInteractable.MovementType.Kinematic;
+            MeleeWeaponGrabColliderUtility.RefreshGrabColliders(grab);
         }
 
         static MotionAnchors EnsureMotionAnchors(GameObject weaponRoot)
@@ -586,6 +646,7 @@ namespace VRProject.Presentation.Combat
 
         void Awake()
         {
+            SceneMeleeWeaponSetup.StripMiswiredAncestorGrabInteractables(gameObject);
             _grab = GetComponent<XRGrabInteractable>();
         }
 

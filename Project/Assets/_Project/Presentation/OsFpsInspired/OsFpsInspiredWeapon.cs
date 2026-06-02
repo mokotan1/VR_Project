@@ -60,7 +60,7 @@ namespace VRProject.Presentation.OsFpsInspired
         [SerializeField] GameObject _bulletVisualPrefab;
         [Tooltip("탄환 모델이 너무 작게 보이면 크기를 키웁니다.")]
         [Range(0.1f, 200f)]
-        [SerializeField] float _bulletVisualScale = 56f;
+        [SerializeField] float _bulletVisualScale = 1f;
         [Tooltip("이펙트가 날아가는 속도(보여 주기용). 실제 맞춤 판정은 즉시 레이캐스트입니다.")]
         [Range(5f, 200f)]
         [SerializeField] float _bulletSpeed = 95f;
@@ -68,7 +68,9 @@ namespace VRProject.Presentation.OsFpsInspired
         [Range(0.05f, 3f)]
         [SerializeField] float _bulletMuzzleForwardOffset = 0.45f;
         [Tooltip("탄환 프리팹이 눕혀 보이면 각도를 조절합니다. (고급)")]
-        [SerializeField] Vector3 _bulletVisualEulerOffset = new Vector3(90f, 0f, 0f);
+        [SerializeField] Vector3 _bulletVisualEulerOffset = new(90f, 0f, 0f);
+
+        public GameObject SharedBulletVisualPrefab => _bulletVisualPrefab;
 
         [Header("맞춤 판정 (고급)")]
         [Tooltip("레이가 맞출 레이어. 비어 있지 않게 두는 것이 일반적입니다.")]
@@ -301,9 +303,9 @@ namespace VRProject.Presentation.OsFpsInspired
             }
 
             var go = new GameObject("WeaponFirePoint");
-            go.transform.position = best;
-            go.transform.rotation = Quaternion.LookRotation(forward, gunRoot.up);
-            go.transform.SetParent(gunRoot, true);
+            go.transform.SetParent(gunRoot, false);
+            go.transform.localPosition = gunRoot.InverseTransformPoint(best);
+            go.transform.localRotation = Quaternion.identity;
             return go.transform;
         }
 
@@ -372,14 +374,28 @@ namespace VRProject.Presentation.OsFpsInspired
 
             // 총구 forward는 손 본 애니 때문에 아래/옆으로 틀어질 수 있음 → 조준은 항상 카메라 십자(뷰포트 중앙) 방향.
             var aimRay = cam.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0f));
-            var aimDir = aimRay.direction.normalized;
 
-            var muzzleTr = ResolveMuzzleTransform();
-            var spawnPos = muzzleTr != null
-                ? muzzleTr.position
-                : aimRay.origin + aimDir * Mathf.Clamp(_bulletMuzzleForwardOffset, 0.05f, 3f);
-
-            SpawnBulletVisual(spawnPos, aimDir);
+            if (_handGunVisual != null &&
+                UnityChanPrototypeWeaponMuzzleDefaults.TryGetMuzzleWorldPose(_handGunVisual, out var spawnPos, out _))
+            {
+                var aimDir = UnityChanPrototypeWeaponMuzzleDefaults.ComputeAimDirectionFromViewport(
+                    cam,
+                    spawnPos,
+                    _maxDistance);
+                SpawnBulletVisual(spawnPos, aimDir);
+            }
+            else
+            {
+                var muzzleTr = ResolveMuzzleTransform();
+                var fallbackPos = muzzleTr != null
+                    ? muzzleTr.position
+                    : aimRay.origin + aimRay.direction.normalized * Mathf.Clamp(_bulletMuzzleForwardOffset, 0.05f, 3f);
+                var aimDir = UnityChanPrototypeWeaponMuzzleDefaults.ComputeAimDirectionFromViewport(
+                    cam,
+                    fallbackPos,
+                    _maxDistance);
+                SpawnBulletVisual(fallbackPos, aimDir);
+            }
 
             if (!TryFirstWorldHitExcludingSelf(aimRay, out var hit))
                 return;

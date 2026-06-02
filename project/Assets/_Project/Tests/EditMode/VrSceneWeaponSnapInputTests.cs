@@ -25,7 +25,7 @@ namespace VRProject.Tests.EditMode
         }
 
         [Test]
-        public void SnapSceneWeaponsToRightFront_MovesExistingGunAndAxeWithoutCreatingRuntimeGun()
+        public void SnapSceneWeaponsToRightFront_MovesAxeOnly_Hk416UsesGripTriggerFire()
         {
             _xrObject = new GameObject("XR Origin (XR Rig)");
             var origin = _xrObject.AddComponent<XROrigin>();
@@ -37,6 +37,7 @@ namespace VRProject.Tests.EditMode
             _rightController.transform.SetPositionAndRotation(new Vector3(1f, 2f, 3f), Quaternion.identity);
 
             _gun = CreateHk416PickupRoot();
+            var gunStartPos = _gun.transform.position;
             _axe = new GameObject("MeleeWeapon_Axe");
             _axe.AddComponent<MeleeWeaponRuntimeBinder>();
             _axe.AddComponent<MeleeWeaponVrGrabLifecycle>();
@@ -56,15 +57,11 @@ namespace VRProject.Tests.EditMode
 
             snapInput.SnapSceneWeaponsToRightFront();
 
-            Assert.IsNotNull(_gun.GetComponent<WeaponHitDetector>());
-            Assert.IsNotNull(_gun.GetComponent<XRGrabInteractable>());
-            Assert.IsNotNull(_gun.GetComponent<MeleeWeaponVrGrabLifecycle>());
+            Assert.AreEqual(gunStartPos, _gun.transform.position);
+            Assert.IsNull(_gun.transform.parent);
 
-            var firstSlot = new Vector3(1.32f, 1.88f, 3.55f);
-            var secondSlot = new Vector3(1.32f, 1.70f, 3.47f);
-            Assert.IsTrue(IsInSnapSlot(_gun.transform.position, firstSlot, secondSlot));
-            Assert.IsTrue(IsInSnapSlot(_axe.transform.position, firstSlot, secondSlot));
-            Assert.Greater(Vector3.Distance(_gun.transform.position, _axe.transform.position), 0.001f);
+            var axeSlot = new Vector3(1.32f, 1.88f, 3.55f);
+            Assert.IsTrue(IsInSnapSlot(_axe.transform.position, axeSlot, axeSlot));
             Assert.AreEqual(_rightController.transform, _axe.transform.parent);
             Assert.IsTrue(vrSource.IsActive);
             Assert.IsFalse(flatSource.enabled);
@@ -132,6 +129,21 @@ namespace VRProject.Tests.EditMode
                 gripButton: false,
                 gripValue: 0.2f,
                 analogThreshold: 0.55f));
+        }
+
+        [Test]
+        public void ResolveRightHandAnchor_FindsChildNamedRightController()
+        {
+            _xrObject = new GameObject("XR Origin (XR Rig)");
+            var origin = _xrObject.AddComponent<XROrigin>();
+            _rightController = new GameObject("Right Controller");
+            _rightController.transform.SetParent(_xrObject.transform, false);
+
+            var snapInput = _xrObject.AddComponent<VrSceneWeaponSnapInput>();
+            snapInput.Bind(origin);
+
+            Assert.AreEqual(_rightController.transform, snapInput.ResolveRightHandAnchor());
+            Object.DestroyImmediate(_xrObject);
         }
     }
 }

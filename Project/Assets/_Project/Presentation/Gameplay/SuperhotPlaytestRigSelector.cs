@@ -79,6 +79,8 @@ namespace VRProject.Presentation.Gameplay
             if (snapInput == null)
                 snapInput = root.AddComponent<VrSceneWeaponSnapInput>();
             snapInput.Bind(xrOrigin);
+
+            VrPlaytestXrOriginBootstrap.EnsureCombatStackOn(xrOrigin);
         }
 
         static void ApplyLegacyPlayerVisibility(bool useXr, XROrigin xrOrigin, SuperhotFlatPlaytestRig flatRig)
