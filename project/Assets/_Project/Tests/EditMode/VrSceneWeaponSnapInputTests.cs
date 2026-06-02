@@ -110,8 +110,12 @@ namespace VRProject.Tests.EditMode
         }
 
         [Test]
-        public void IsControllerPickupPressed_ReturnsTrueForGripButton()
+        public void IsSceneMeleePickupPressed_IgnoresGrip_GripIsForHk416Hold()
         {
+            Assert.IsFalse(VrSceneWeaponSnapInput.IsSceneMeleePickupPressed(
+                triggerButton: false,
+                triggerValue: 0f,
+                analogThreshold: 0.55f));
             Assert.IsTrue(VrSceneWeaponSnapInput.IsControllerPickupPressed(
                 triggerButton: false,
                 triggerValue: 0f,
@@ -121,13 +125,20 @@ namespace VRProject.Tests.EditMode
         }
 
         [Test]
-        public void IsControllerPickupPressed_ReturnsFalseWhenNeitherPressed()
+        public void IsSceneMeleePickupPressed_ReturnsTrueForTrigger()
         {
-            Assert.IsFalse(VrSceneWeaponSnapInput.IsControllerPickupPressed(
+            Assert.IsTrue(VrSceneWeaponSnapInput.IsSceneMeleePickupPressed(
+                triggerButton: true,
+                triggerValue: 0f,
+                analogThreshold: 0.55f));
+        }
+
+        [Test]
+        public void IsSceneMeleePickupPressed_ReturnsFalseWhenTriggerBelowThreshold()
+        {
+            Assert.IsFalse(VrSceneWeaponSnapInput.IsSceneMeleePickupPressed(
                 triggerButton: false,
                 triggerValue: 0.1f,
-                gripButton: false,
-                gripValue: 0.2f,
                 analogThreshold: 0.55f));
         }
 

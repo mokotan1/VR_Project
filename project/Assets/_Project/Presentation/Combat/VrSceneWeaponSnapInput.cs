@@ -29,17 +29,15 @@ namespace VRProject.Presentation.Combat
                 _fireHand,
                 out var triggerButton,
                 out var triggerValue,
-                out var gripButton,
-                out var gripValue);
+                out _,
+                out _);
 
             if (!_pickupDetector.Tick(
-                    IsControllerPickupPressed(
-                        triggerButton,
-                        triggerValue,
-                        gripButton,
-                        gripValue,
-                        _analogTriggerThreshold),
+                    IsSceneMeleePickupPressed(triggerButton, triggerValue, _analogTriggerThreshold),
                     out _pickupDetector))
+                return;
+
+            if (HasHk416ChildOnAnchor(ResolveRightHandAnchor()))
                 return;
 
             if (TryReleaseSnappedWeapons())
@@ -206,13 +204,21 @@ namespace VRProject.Presentation.Combat
 #endif
         }
 
+        /// <summary>Scene axe/melee snap toggle — trigger (or editor mouse) only; grip is for HK416 hold.</summary>
+        public static bool IsSceneMeleePickupPressed(
+            bool triggerButton,
+            float triggerValue,
+            float analogThreshold) =>
+            IsControllerTriggerPressed(triggerButton, triggerValue, analogThreshold) ||
+            IsEditorMousePickupPressed();
+
         public static bool IsControllerPickupPressed(
             bool triggerButton,
             float triggerValue,
             bool gripButton,
             float gripValue,
             float analogThreshold) =>
-            IsControllerTriggerPressed(triggerButton, triggerValue, analogThreshold) ||
+            IsSceneMeleePickupPressed(triggerButton, triggerValue, analogThreshold) ||
             IsControllerGripPressed(gripButton, gripValue, analogThreshold);
 
         public static bool IsControllerTriggerPressed(bool triggerButton, float triggerValue, float analogThreshold) =>

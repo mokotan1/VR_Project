@@ -1,9 +1,10 @@
+using System;
 using UnityEngine;
 
 namespace VRProject.Presentation.PrototypeFps
 {
     /// <summary>
-    /// Simple forward-moving visual for hitscan weapons; damage stays on the weapon raycast.
+    /// Forward-moving bullet visual. Optional per-frame segment callback for deferred hit tests (e.g. sphere sweep).
     /// </summary>
     public sealed class PrototypeFpsBulletProjectile : MonoBehaviour
     {
@@ -11,13 +12,20 @@ namespace VRProject.Presentation.PrototypeFps
         float _speed;
         float _maxDistance;
         Vector3 _spawnPosition;
+        Func<Vector3, Vector3, bool> _tryHitMoveSegment;
 
-        public void Launch(Vector3 worldDirection, float speed, float maxDistance, Vector3 visualEulerOffset = default)
+        public void Launch(
+            Vector3 worldDirection,
+            float speed,
+            float maxDistance,
+            Vector3 visualEulerOffset = default,
+            Func<Vector3, Vector3, bool> tryHitMoveSegment = null)
         {
             _direction = worldDirection.sqrMagnitude > 0.0001f ? worldDirection.normalized : Vector3.forward;
             _speed = speed;
             _maxDistance = maxDistance;
             _spawnPosition = transform.position;
+            _tryHitMoveSegment = tryHitMoveSegment;
 
             transform.rotation = RotationForFlight(_direction, visualEulerOffset);
         }
@@ -34,7 +42,17 @@ namespace VRProject.Presentation.PrototypeFps
 
         void Update()
         {
-            transform.position += _direction * (_speed * Time.deltaTime);
+            var step = _direction * (_speed * Time.deltaTime);
+            var from = transform.position;
+            var to = from + step;
+
+            if (_tryHitMoveSegment != null && step.sqrMagnitude > 1e-8f && _tryHitMoveSegment(from, to))
+            {
+                Destroy(gameObject);
+                return;
+            }
+
+            transform.position = to;
             if ((transform.position - _spawnPosition).sqrMagnitude > _maxDistance * _maxDistance)
                 Destroy(gameObject);
         }

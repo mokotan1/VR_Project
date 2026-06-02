@@ -45,6 +45,30 @@ namespace VRProject.Tests.EditMode.Gameplay
         }
 
         [Test]
+        public void TryGetShotPoseFromFirePoint_UsesTransformPositionAndForward()
+        {
+            var gun = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            gun.name = "HandGun_HK416";
+            var firePoint = new GameObject("WeaponFirePoint").transform;
+            firePoint.SetParent(gun.transform, false);
+            firePoint.localPosition = new Vector3(0f, 0.05f, 0.4f);
+            firePoint.localRotation = Quaternion.Euler(10f, 0f, 0f);
+            try
+            {
+                Assert.IsTrue(UnityChanPrototypeWeaponMuzzleDefaults.TryGetShotPoseFromFirePoint(
+                    firePoint,
+                    out var pos,
+                    out var dir));
+                Assert.Less(Vector3.Distance(pos, firePoint.position), 1e-4f);
+                Assert.Less(Vector3.Angle(dir, firePoint.forward), 0.5f);
+            }
+            finally
+            {
+                Object.DestroyImmediate(gun);
+            }
+        }
+
+        [Test]
         public void RotationForFlight_ZeroOffset_PointsLocalZAlongVelocity()
         {
             var dir = new Vector3(0f, 0f, 1f);
@@ -153,6 +177,55 @@ namespace VRProject.Tests.EditMode.Gameplay
             Object.DestroyImmediate(shooter);
             if (enemy != null)
                 Object.DestroyImmediate(enemy);
+        }
+
+        [Test]
+        public void TrySweepSegmentKillEnemy_KillsSuperhotEnemyWhenSegmentReachesCollider()
+        {
+            var shooter = new GameObject("Shooter");
+            var enemy = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            enemy.name = "Enemy";
+            enemy.transform.position = new Vector3(0f, 0f, 5f);
+            enemy.AddComponent<SuperhotEnemy>();
+
+            var segmentStart = new Vector3(0f, 0f, 4f);
+            var segmentEnd = new Vector3(0f, 0f, 6f);
+            Assert.IsTrue(SuperhotVrHk416FireLogic.TrySweepSegmentKillEnemy(
+                segmentStart,
+                segmentEnd,
+                sphereRadius: 0.05f,
+                hitMask: Physics.DefaultRaycastLayers,
+                exclusionRoot: shooter.transform,
+                out var hit));
+            Assert.Greater(hit.distance, 0f);
+
+            Object.DestroyImmediate(shooter);
+            if (enemy != null)
+                Object.DestroyImmediate(enemy);
+        }
+
+        [Test]
+        public void TrySweepSegmentKillEnemy_DoesNotKillBeforeSegmentReachesEnemy()
+        {
+            var shooter = new GameObject("Shooter");
+            var enemy = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            enemy.name = "Enemy";
+            enemy.transform.position = new Vector3(0f, 0f, 5f);
+            var enemyComponent = enemy.AddComponent<SuperhotEnemy>();
+
+            var segmentStart = new Vector3(0f, 0f, 0f);
+            var segmentEnd = new Vector3(0f, 0f, 2f);
+            Assert.IsFalse(SuperhotVrHk416FireLogic.TrySweepSegmentKillEnemy(
+                segmentStart,
+                segmentEnd,
+                sphereRadius: 0.05f,
+                hitMask: Physics.DefaultRaycastLayers,
+                exclusionRoot: shooter.transform,
+                out _));
+            Assert.IsNotNull(enemyComponent);
+
+            Object.DestroyImmediate(shooter);
+            Object.DestroyImmediate(enemy);
         }
     }
 }

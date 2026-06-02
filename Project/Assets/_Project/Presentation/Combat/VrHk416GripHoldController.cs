@@ -8,7 +8,7 @@ namespace VRProject.Presentation.Combat
     /// While grip is held (simulator G), snaps the nearest floor HK416 to the right hand.
     /// Releasing grip drops the weapon back to the scene.
     /// </summary>
-    [DefaultExecutionOrder(40)]
+    [DefaultExecutionOrder(-10)]
     [DisallowMultipleComponent]
     public sealed class VrHk416GripHoldController : MonoBehaviour
     {

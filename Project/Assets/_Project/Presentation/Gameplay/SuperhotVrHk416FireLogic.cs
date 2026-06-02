@@ -5,7 +5,7 @@ using VRProject.Presentation.Combat;
 namespace VRProject.Presentation.Gameplay
 {
     /// <summary>
-    /// XR HK416 hitscan: camera aim, muzzle tracer spawn, <see cref="SuperhotEnemy"/> instant kill.
+    /// XR HK416: muzzle tracer spawn; <see cref="SuperhotEnemy"/> kill on swept sphere along tracer motion.
     /// </summary>
     public static class SuperhotVrHk416FireLogic
     {
@@ -99,13 +99,78 @@ namespace VRProject.Presentation.Gameplay
             float maxDistance,
             LayerMask hitMask,
             Transform exclusionRoot,
+            out RaycastHit bestHit) =>
+            TryKillFirstSuperhotEnemyAlongCast(
+                origin: aimRay.origin,
+                direction: aimRay.direction,
+                maxDistance: maxDistance,
+                sphereRadius: 0f,
+                useSphereCast: false,
+                hitMask: hitMask,
+                exclusionRoot: exclusionRoot,
+                out bestHit);
+
+        /// <summary>
+        /// Sweeps a sphere along the tracer segment (frame motion). Kill happens when the bullet reaches the hit.
+        /// </summary>
+        public static bool TrySweepSegmentKillEnemy(
+            Vector3 segmentStart,
+            Vector3 segmentEnd,
+            float sphereRadius,
+            LayerMask hitMask,
+            Transform exclusionRoot,
             out RaycastHit bestHit)
         {
-            var hits = Physics.RaycastAll(
-                aimRay,
-                maxDistance,
+            var delta = segmentEnd - segmentStart;
+            var distance = delta.magnitude;
+            if (distance < 1e-6f)
+            {
+                bestHit = default;
+                return false;
+            }
+
+            return TryKillFirstSuperhotEnemyAlongCast(
+                segmentStart,
+                delta / distance,
+                distance,
+                Mathf.Max(0.001f, sphereRadius),
+                useSphereCast: true,
                 hitMask,
-                QueryTriggerInteraction.Ignore);
+                exclusionRoot,
+                out bestHit);
+        }
+
+        static bool TryKillFirstSuperhotEnemyAlongCast(
+            Vector3 origin,
+            Vector3 direction,
+            float maxDistance,
+            float sphereRadius,
+            bool useSphereCast,
+            LayerMask hitMask,
+            Transform exclusionRoot,
+            out RaycastHit bestHit)
+        {
+            RaycastHit[] hits;
+            if (useSphereCast)
+            {
+                hits = Physics.SphereCastAll(
+                    origin,
+                    sphereRadius,
+                    direction,
+                    maxDistance,
+                    hitMask,
+                    QueryTriggerInteraction.Ignore);
+            }
+            else
+            {
+                hits = Physics.RaycastAll(
+                    origin,
+                    direction,
+                    maxDistance,
+                    hitMask,
+                    QueryTriggerInteraction.Ignore);
+            }
+
             if (hits.Length == 0)
             {
                 bestHit = default;

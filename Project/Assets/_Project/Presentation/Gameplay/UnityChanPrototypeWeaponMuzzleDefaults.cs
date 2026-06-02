@@ -32,6 +32,21 @@ namespace VRProject.Presentation.Gameplay
             return delta.normalized;
         }
 
+        /// <summary><see cref="WeaponFirePoint"/> 월드 위치·전방(+Z). 없으면 false.</summary>
+        public static bool TryGetShotPoseFromFirePoint(Transform firePoint, out Vector3 position, out Vector3 direction)
+        {
+            position = default;
+            direction = Vector3.forward;
+            if (firePoint == null)
+                return false;
+
+            position = firePoint.position;
+            direction = firePoint.forward.sqrMagnitude > 1e-6f
+                ? firePoint.forward.normalized
+                : Vector3.forward;
+            return true;
+        }
+
         public static bool TryGetMuzzleWorldPose(GameObject gunVisual, out Vector3 position, out Vector3 forward)
         {
             position = default;
@@ -41,7 +56,7 @@ namespace VRProject.Presentation.Gameplay
 
             var gunRoot = gunVisual.transform;
             var authored = FindFirePoint(gunRoot);
-            if (authored != null && authored.parent == gunRoot)
+            if (authored != null)
             {
                 position = authored.position;
                 forward = authored.forward;
@@ -68,11 +83,7 @@ namespace VRProject.Presentation.Gameplay
             var gunRoot = gunVisual.transform;
             var existing = FindFirePoint(gunRoot);
             if (existing != null)
-            {
-                if (existing.parent == gunRoot)
-                    SyncFirePointLocalFromGun(gunVisual, existing);
                 return existing;
-            }
 
             var firePoint = new GameObject(FirePointName).transform;
             firePoint.SetParent(gunRoot, false);
@@ -131,18 +142,24 @@ namespace VRProject.Presentation.Gameplay
 
         static Transform FindFirePoint(Transform root)
         {
+            Transform fallback = null;
+            var exactName = FirePointName.ToLowerInvariant();
             foreach (var tr in root.GetComponentsInChildren<Transform>(true))
             {
                 if (tr == null || tr == root)
                     continue;
 
                 var n = tr.name.ToLowerInvariant();
-                if (n.Contains("muzzle") || n.Contains("firepoint") || n.Contains("fire_point") ||
-                    n.Contains("barrel_tip") || n == FirePointName.ToLowerInvariant())
+                if (n == exactName)
                     return tr;
+
+                if (fallback == null &&
+                    (n.Contains("muzzle") || n.Contains("firepoint") || n.Contains("fire_point") ||
+                     n.Contains("barrel_tip")))
+                    fallback = tr;
             }
 
-            return null;
+            return fallback;
         }
 
         static bool TryFindForwardBoundsPoint(GameObject gunVisual, out Vector3 worldPoint, out Quaternion worldRotation)

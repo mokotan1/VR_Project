@@ -372,32 +372,33 @@ namespace VRProject.Presentation.OsFpsInspired
             _ammoInMag--;
             _lastFireUnscaledTime = Time.unscaledTime;
 
-            // 총구 forward는 손 본 애니 때문에 아래/옆으로 틀어질 수 있음 → 조준은 항상 카메라 십자(뷰포트 중앙) 방향.
-            var aimRay = cam.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0f));
+            var muzzleTr = ResolveMuzzleTransform();
+            if (muzzleTr == null && _handGunVisual != null)
+                muzzleTr = UnityChanPrototypeWeaponMuzzleDefaults.EnsureFirePoint(_handGunVisual);
 
-            if (_handGunVisual != null &&
-                UnityChanPrototypeWeaponMuzzleDefaults.TryGetMuzzleWorldPose(_handGunVisual, out var spawnPos, out _))
+            Ray hitscanRay;
+            if (muzzleTr != null &&
+                UnityChanPrototypeWeaponMuzzleDefaults.TryGetShotPoseFromFirePoint(
+                    muzzleTr,
+                    out var spawnPos,
+                    out var aimDir))
             {
-                var aimDir = UnityChanPrototypeWeaponMuzzleDefaults.ComputeAimDirectionFromViewport(
-                    cam,
-                    spawnPos,
-                    _maxDistance);
                 SpawnBulletVisual(spawnPos, aimDir);
+                hitscanRay = new Ray(spawnPos, aimDir);
             }
             else
             {
-                var muzzleTr = ResolveMuzzleTransform();
-                var fallbackPos = muzzleTr != null
-                    ? muzzleTr.position
-                    : aimRay.origin + aimRay.direction.normalized * Mathf.Clamp(_bulletMuzzleForwardOffset, 0.05f, 3f);
-                var aimDir = UnityChanPrototypeWeaponMuzzleDefaults.ComputeAimDirectionFromViewport(
+                var viewportRay = cam.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0f));
+                var fallbackPos = viewportRay.origin + viewportRay.direction.normalized * Mathf.Clamp(_bulletMuzzleForwardOffset, 0.05f, 3f);
+                var fallbackDir = UnityChanPrototypeWeaponMuzzleDefaults.ComputeAimDirectionFromViewport(
                     cam,
                     fallbackPos,
                     _maxDistance);
-                SpawnBulletVisual(fallbackPos, aimDir);
+                SpawnBulletVisual(fallbackPos, fallbackDir);
+                hitscanRay = new Ray(fallbackPos, fallbackDir);
             }
 
-            if (!TryFirstWorldHitExcludingSelf(aimRay, out var hit))
+            if (!TryFirstWorldHitExcludingSelf(hitscanRay, out var hit))
                 return;
 
             var dmg = hit.collider.GetComponentInParent<OsFpsInspiredDamageable>();

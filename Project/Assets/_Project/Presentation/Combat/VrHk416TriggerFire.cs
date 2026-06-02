@@ -25,6 +25,7 @@ namespace VRProject.Presentation.Combat
         [SerializeField] float _bulletVisualScale = 1f;
         [SerializeField] float _bulletSpeed = 95f;
         [SerializeField] Vector3 _bulletVisualEulerOffset = new(90f, 0f, 0f);
+        [SerializeField, Range(0.01f, 0.2f)] float _sweepHitRadius = 0.05f;
 
         VrTriggerPressDetector _triggerEdgeDetector;
         float _nextFireUnscaledTime;
@@ -97,30 +98,20 @@ namespace VRProject.Presentation.Combat
             if (!SuperhotVrHk416FireLogic.TryGetHk416OnHandAnchor(anchor, out var weaponRoot))
                 return false;
 
-            var cam = _xrOrigin.Camera;
-            var aimRay = cam.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0f));
             var gunVisual = SuperhotVrHk416FireLogic.ResolveGunVisual(weaponRoot);
             if (gunVisual == null)
                 return false;
 
-            UnityChanPrototypeWeaponMuzzleDefaults.TryGetMuzzleWorldPose(
-                gunVisual,
-                out var spawnPos,
-                out _);
-            var aimDir = UnityChanPrototypeWeaponMuzzleDefaults.ComputeAimDirectionFromViewport(
-                cam,
-                spawnPos,
-                _maxDistance);
             var muzzleTransform = UnityChanPrototypeWeaponMuzzleDefaults.EnsureFirePoint(gunVisual);
+            if (muzzleTransform == null ||
+                !UnityChanPrototypeWeaponMuzzleDefaults.TryGetShotPoseFromFirePoint(
+                    muzzleTransform,
+                    out var spawnPos,
+                    out var aimDir))
+                return false;
 
             SpawnBulletVisual(spawnPos, aimDir);
             PlayerWeaponFirePointForAi.Publish(this, muzzleTransform);
-            SuperhotVrHk416FireLogic.TryRaycastKillEnemy(
-                aimRay,
-                _maxDistance,
-                _hitMask,
-                _xrOrigin.transform,
-                out _);
 
             _nextFireUnscaledTime = Time.unscaledTime + Mathf.Max(0.05f, _fireCooldownSeconds);
             _lastShootUnscaledTime = Time.unscaledTime;
@@ -170,7 +161,19 @@ namespace VRProject.Presentation.Combat
             var proj = go.GetComponent<PrototypeFpsBulletProjectile>();
             if (proj == null)
                 proj = go.AddComponent<PrototypeFpsBulletProjectile>();
-            proj.Launch(direction, _bulletSpeed, _maxDistance, eulerForLaunch);
+            var exclusionRoot = _xrOrigin != null ? _xrOrigin.transform : null;
+            proj.Launch(
+                direction,
+                _bulletSpeed,
+                _maxDistance,
+                eulerForLaunch,
+                (from, to) => SuperhotVrHk416FireLogic.TrySweepSegmentKillEnemy(
+                    from,
+                    to,
+                    _sweepHitRadius,
+                    _hitMask,
+                    exclusionRoot,
+                    out _));
         }
     }
 }
