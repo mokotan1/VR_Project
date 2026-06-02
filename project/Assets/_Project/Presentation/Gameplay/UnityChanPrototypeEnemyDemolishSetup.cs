@@ -16,6 +16,9 @@ namespace VRProject.Presentation.Gameplay
             if (enemyRoot.GetComponent<EnemyPoseDemolishOnDeath>() == null)
                 enemyRoot.AddComponent<EnemyPoseDemolishOnDeath>();
 
+            if (enemyRoot.GetComponent<EnemyHitColorTint>() == null)
+                enemyRoot.AddComponent<EnemyHitColorTint>();
+
             return true;
         }
     }

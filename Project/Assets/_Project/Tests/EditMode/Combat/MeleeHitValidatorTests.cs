@@ -12,6 +12,10 @@ namespace VRProject.Tests.EditMode.Combat
                 sessionActive: false,
                 qualifyingScore: 1f,
                 minQualifyingScore: 0.3f,
+                linearSpeedMetersPerSecond: 2f,
+                angularSpeedDegreesPerSecond: 120f,
+                minHitLinearSpeed: 1.5f,
+                minHitAngularSpeed: 110f,
                 WeaponAttackKind.Slash,
                 WeaponFamily.Hybrid);
             Assert.IsFalse(ok);
@@ -31,10 +35,31 @@ namespace VRProject.Tests.EditMode.Combat
                 sessionActive: true,
                 qualifyingScore: score,
                 minQualifyingScore: 0.2f,
+                linearSpeedMetersPerSecond: 2f,
+                angularSpeedDegreesPerSecond: 120f,
+                minHitLinearSpeed: 1.5f,
+                minHitAngularSpeed: 110f,
                 WeaponAttackKind.Slash,
                 WeaponFamily.Hybrid);
 
             Assert.IsTrue(ok);
+        }
+
+        [Test]
+        public void IsQualifyingHit_False_WhenSessionActiveButHitSpeedTooLow()
+        {
+            var ok = MeleeHitValidator.IsQualifyingHit(
+                sessionActive: true,
+                qualifyingScore: 0.9f,
+                minQualifyingScore: 0.35f,
+                linearSpeedMetersPerSecond: 0.2f,
+                angularSpeedDegreesPerSecond: 10f,
+                minHitLinearSpeed: 1.6f,
+                minHitAngularSpeed: 110f,
+                WeaponAttackKind.Slash,
+                WeaponFamily.Hybrid);
+
+            Assert.IsFalse(ok);
         }
     }
 }

@@ -57,6 +57,11 @@ namespace VRProject.Presentation.Combat
                 weapon.SetEquipped(false);
         }
 
+        public void MarkPickedUpForVrSnap()
+        {
+            _pickedUp = true;
+        }
+
         void BindFlatAndMobileSources()
         {
             var router = GetComponent<WeaponMotionSourceRouter>();

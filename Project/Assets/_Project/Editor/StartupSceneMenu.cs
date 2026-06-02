@@ -35,26 +35,28 @@ namespace VRProject.EditorTools
             canvasGo.AddComponent<CanvasScaler>().uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
             canvasGo.AddComponent<GraphicRaycaster>();
 
-            var root = CreatePanel(canvasGo.transform, "Root", new Vector2(0.5f, 0.5f), new Vector2(780f, 560f));
-            var title = CreateText(root.transform, "Title", "Device Connection", 32, new Vector2(0f, 210f), new Vector2(700f, 60f));
+            var root = CreatePanel(canvasGo.transform, "Root", new Vector2(0.5f, 0.5f), new Vector2(780f, 620f));
+            var title = CreateText(root.transform, "Title", "Device Connection", 32, new Vector2(0f, 240f), new Vector2(700f, 60f));
             title.alignment = TextAnchor.MiddleCenter;
 
-            var platformText = CreateText(root.transform, "PlatformText", "Device: Checking...", 22, new Vector2(0f, 140f), new Vector2(700f, 40f));
-            var xrText = CreateText(root.transform, "XrStatusText", "VR Headset: Checking...", 22, new Vector2(0f, 90f), new Vector2(700f, 40f));
-            var mobileText = CreateText(root.transform, "MobileStatusText", "Mobile Play: Checking...", 22, new Vector2(0f, 40f), new Vector2(700f, 40f));
-            var messageText = CreateText(root.transform, "MessageText", "Choose a play mode after device status is checked.", 20, new Vector2(0f, -25f), new Vector2(700f, 60f));
+            var platformText = CreateText(root.transform, "PlatformText", "Device: Checking...", 22, new Vector2(0f, 180f), new Vector2(700f, 40f));
+            var bluetoothText = CreateText(root.transform, "BluetoothStatusText", "Bluetooth: Checking...", 22, new Vector2(0f, 130f), new Vector2(700f, 40f));
+            var metaQuestText = CreateText(root.transform, "MetaQuestStatusText", "Meta Quest: Checking...", 22, new Vector2(0f, 80f), new Vector2(700f, 40f));
+            var xrText = CreateText(root.transform, "XrStatusText", "VR Play: Checking...", 22, new Vector2(0f, 30f), new Vector2(700f, 40f));
+            var mobileText = CreateText(root.transform, "MobileStatusText", "Mobile Play: Checking...", 22, new Vector2(0f, -20f), new Vector2(700f, 40f));
+            var messageText = CreateText(root.transform, "MessageText", "Choose a play mode after device status is checked.", 20, new Vector2(0f, -80f), new Vector2(700f, 60f));
             messageText.alignment = TextAnchor.MiddleCenter;
 
-            var refreshButton = CreateButton(root.transform, "RefreshButton", "Refresh", new Vector2(-240f, -125f), new Vector2(160f, 54f));
-            var mobileButton = CreateButton(root.transform, "MobilePlayButton", "Mobile Play", new Vector2(0f, -125f), new Vector2(180f, 54f));
-            var vrButton = CreateButton(root.transform, "VrPlayButton", "VR Play", new Vector2(240f, -125f), new Vector2(180f, 54f));
+            var refreshButton = CreateButton(root.transform, "RefreshButton", "Refresh", new Vector2(-240f, -170f), new Vector2(160f, 54f));
+            var mobileButton = CreateButton(root.transform, "MobilePlayButton", "Mobile Play", new Vector2(0f, -170f), new Vector2(180f, 54f));
+            var vrButton = CreateButton(root.transform, "VrPlayButton", "VR Play", new Vector2(240f, -170f), new Vector2(180f, 54f));
 
             var helpText = CreateText(
                 root.transform,
                 "HelpText",
-                "Android tablet: use Mobile Play. Headset: connect/enable XR, then press Refresh.",
+                "Mobile Play: tablet/phone. VR Play: pair Meta Quest over Bluetooth or connect XR, then press Refresh.",
                 16,
-                new Vector2(0f, -200f),
+                new Vector2(0f, -245f),
                 new Vector2(720f, 40f));
             helpText.alignment = TextAnchor.MiddleCenter;
             helpText.color = new Color(0.78f, 0.83f, 0.9f, 1f);
@@ -65,6 +67,8 @@ namespace VRProject.EditorTools
             so.FindProperty("_probe").objectReferenceValue = systems.GetComponent<DeviceConnectionProbe>();
             so.FindProperty("_session").objectReferenceValue = systems.GetComponent<PlayModeSession>();
             so.FindProperty("_platformText").objectReferenceValue = platformText;
+            so.FindProperty("_bluetoothStatusText").objectReferenceValue = bluetoothText;
+            so.FindProperty("_metaQuestStatusText").objectReferenceValue = metaQuestText;
             so.FindProperty("_xrStatusText").objectReferenceValue = xrText;
             so.FindProperty("_mobileStatusText").objectReferenceValue = mobileText;
             so.FindProperty("_messageText").objectReferenceValue = messageText;

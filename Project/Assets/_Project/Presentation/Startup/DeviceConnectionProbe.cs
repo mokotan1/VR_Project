@@ -1,18 +1,18 @@
 using UnityEngine;
-using UnityEngine.XR;
+using VRProject.Application.Startup;
+using VRProject.Infrastructure.Startup;
 
 namespace VRProject.Presentation.Startup
 {
     /// <summary>
-    /// Samples the current platform and XR runtime to produce a fresh
-    /// <see cref="DeviceConnectionStatus"/>. This is the single place that
-    /// touches Unity device APIs; UI and selection logic depend on the
-    /// resulting value type only.
+    /// Samples the current platform, Bluetooth Meta Quest link, and XR runtime to
+    /// produce a fresh <see cref="DeviceConnectionStatus"/>.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class DeviceConnectionProbe : MonoBehaviour
     {
         public DeviceConnectionStatus CurrentStatus { get; private set; }
+        public VrConnectionReadiness VrReadiness { get; private set; }
 
         void Awake()
         {
@@ -21,13 +21,13 @@ namespace VRProject.Presentation.Startup
 
         public DeviceConnectionStatus Refresh()
         {
+            VrReadiness = VrConnectionSignalSampler.Sample();
+
             var platform = UnityEngine.Application.platform;
             var isAndroid = platform == RuntimePlatform.Android;
             var isEditor = UnityEngine.Application.isEditor;
-            var xrActive = XRSettings.isDeviceActive;
-            var xrName = xrActive
-                ? XRSettings.loadedDeviceName
-                : isEditor ? "XR Device Simulator" : string.Empty;
+            var xrActive = VrReadiness.XrRuntimeActive;
+            var xrName = VrReadiness.XrDeviceName;
             var platformLabel = ResolvePlatformLabel(platform, isAndroid, isEditor);
 
             var mobileAvailable = isAndroid || isEditor ||
@@ -35,7 +35,7 @@ namespace VRProject.Presentation.Startup
                                   platform == RuntimePlatform.OSXPlayer ||
                                   platform == RuntimePlatform.LinuxPlayer;
 
-            var vrAvailable = ResolveVrAvailable(xrActive, isEditor);
+            var vrAvailable = VrPlayAvailability.IsVrPlayAvailable(VrReadiness);
 
             CurrentStatus = new DeviceConnectionStatus(
                 platformLabel,
@@ -44,7 +44,8 @@ namespace VRProject.Presentation.Startup
                 isEditor,
                 xrActive,
                 mobileAvailable,
-                vrAvailable);
+                vrAvailable,
+                VrReadiness);
 
             return CurrentStatus;
         }
@@ -56,11 +57,6 @@ namespace VRProject.Presentation.Startup
             if (isAndroid)
                 return "Android Device";
             return platform.ToString();
-        }
-
-        public static bool ResolveVrAvailable(bool xrDeviceActive, bool isEditor)
-        {
-            return xrDeviceActive || isEditor;
         }
     }
 }

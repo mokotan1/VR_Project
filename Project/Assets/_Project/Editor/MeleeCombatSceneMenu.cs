@@ -120,6 +120,38 @@ namespace VRProject.EditorTools
             Debug.Log($"[VR Project] Unsnap melee floor pickup setup applied to {changed} weapon(s).");
         }
 
+        [MenuItem("VR Project/Combat/Wire Scene Melee Weapons In Open Scene")]
+        public static void WireSceneMeleeWeaponsInOpenScene()
+        {
+            EnsureDefaultProfiles();
+            var profile = AssetDatabase.LoadAssetAtPath<WeaponAttackProfile>(
+                ProfilesFolder + "/WeaponAttackProfile_Axe.asset");
+            if (profile == null)
+            {
+                Debug.LogError("[VR Project] Missing WeaponAttackProfile_Axe asset.");
+                return;
+            }
+
+            var wired = 0;
+            foreach (var root in Object.FindObjectsByType<Transform>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+            {
+                if (root == null || !IsSceneMeleeWeaponRoot(root))
+                    continue;
+
+                if (SceneMeleeWeaponSetup.Ensure(root.gameObject, profile))
+                    wired++;
+            }
+
+            EditorSceneManager.MarkSceneDirty(EditorSceneManager.GetActiveScene());
+            Debug.Log($"[VR Project] Wired scene melee combat stack on {wired} weapon(s).");
+        }
+
+        static bool IsSceneMeleeWeaponRoot(Transform transform)
+        {
+            var name = transform.name;
+            return name.Contains("Axe") || name.Contains("MeleeWeapon");
+        }
+
         [MenuItem("VR Project/Combat/Wire Enemy Melee Hit Zones In Open Scene")]
         public static void WireEnemyMeleeHitZonesInOpenScene()
         {
@@ -335,12 +367,37 @@ namespace VRProject.EditorTools
                 enemyRoot.AddComponent<SuperhotEnemy>();
             if (enemyRoot.GetComponent<DamageReceiver>() == null)
                 enemyRoot.AddComponent<DamageReceiver>();
+            if (enemyRoot.GetComponent<EnemyHitColorTint>() == null)
+                enemyRoot.AddComponent<EnemyHitColorTint>();
+
+            WireGlassShardPrefab(enemyRoot);
 
             var changed = false;
             changed |= EnsureZone(enemyRoot.transform, "HitZone_Head", HitZoneKind.Head, new Vector3(0f, 1.55f, 0f), new Vector3(0.35f, 0.35f, 0.35f), 1.5f);
             changed |= EnsureZone(enemyRoot.transform, "HitZone_Torso", HitZoneKind.Torso, new Vector3(0f, 0.95f, 0f), new Vector3(0.55f, 0.75f, 0.35f), 1f);
             changed |= EnsureZone(enemyRoot.transform, "HitZone_Limb", HitZoneKind.Limb, new Vector3(0.35f, 0.55f, 0f), new Vector3(0.25f, 0.55f, 0.25f), 0.85f);
             return true;
+        }
+
+        const string GlassShardBurstPrefabPath = "Assets/GlassShards/Prefabs/GlassShardBurst.prefab";
+
+        static void WireGlassShardPrefab(GameObject enemyRoot)
+        {
+            var shard = AssetDatabase.LoadAssetAtPath<GameObject>(GlassShardBurstPrefabPath);
+            if (shard == null)
+                return;
+
+            var enemy = enemyRoot.GetComponent<SuperhotEnemy>();
+            if (enemy == null)
+                return;
+
+            var so = new SerializedObject(enemy);
+            var prop = so.FindProperty("_glassShardBurstPrefab");
+            if (prop.objectReferenceValue != null)
+                return;
+
+            prop.objectReferenceValue = shard;
+            so.ApplyModifiedPropertiesWithoutUndo();
         }
 
         static bool EnsureZone(

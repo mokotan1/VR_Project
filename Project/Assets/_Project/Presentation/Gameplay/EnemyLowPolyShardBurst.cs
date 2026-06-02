@@ -45,12 +45,23 @@ namespace VRProject.Presentation.Gameplay
             Material material,
             Settings settings)
         {
+            return Spawn(sourceName, sourceBounds, hitPoint, material, settings, Vector3.zero);
+        }
+
+        public static GameObject Spawn(
+            string sourceName,
+            Bounds sourceBounds,
+            Vector3 hitPoint,
+            Material material,
+            Settings settings,
+            Vector3 impulseDirection)
+        {
             var parent = new GameObject($"{sourceName}_LowPolyShards");
             parent.transform.position = sourceBounds.center;
 
             var count = Mathf.Clamp(settings.ShardCount, 1, 16);
             for (var i = 0; i < count; i++)
-                CreateShard(parent.transform, sourceBounds, hitPoint, material, settings, i, count);
+                CreateShard(parent.transform, sourceBounds, hitPoint, material, settings, impulseDirection, i, count);
 
             return parent;
         }
@@ -61,6 +72,7 @@ namespace VRProject.Presentation.Gameplay
             Vector3 hitPoint,
             Material material,
             Settings settings,
+            Vector3 impulseDirection,
             int index,
             int count)
         {
@@ -93,7 +105,10 @@ namespace VRProject.Presentation.Gameplay
             if (direction.sqrMagnitude < 1e-6f)
                 direction = Vector3.up;
 
-            rb.AddForce(direction.normalized * settings.Impulse, ForceMode.Impulse);
+            if (impulseDirection.sqrMagnitude > 1e-6f)
+                direction = (direction.normalized * 0.45f + impulseDirection.normalized * 0.85f).normalized;
+
+            rb.AddForce(direction * settings.Impulse, ForceMode.Impulse);
             if (settings.Torque > 0f)
                 rb.AddTorque(BuildDeterministicAxis(index) * settings.Torque, ForceMode.Impulse);
         }

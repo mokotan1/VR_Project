@@ -102,6 +102,47 @@ namespace VRProject.Application.Combat
         }
     }
 
+    public readonly struct MeleeBladeTipHitColliderSpec
+    {
+        public MeleeBladeTipHitColliderSpec(CombatVector3 localCenter, CombatVector3 localSize)
+        {
+            LocalCenter = localCenter;
+            LocalSize = localSize;
+        }
+
+        public CombatVector3 LocalCenter { get; }
+        public CombatVector3 LocalSize { get; }
+    }
+
+    public static class MeleeHitColliderLayout
+    {
+        public const float DefaultBladeLengthMeters = 0.18f;
+        public const float DefaultBladeWidthMeters = 0.08f;
+        public const float DefaultBladeThicknessMeters = 0.05f;
+        const float CenterBackFromTipFactor = 0.35f;
+
+        public static MeleeBladeTipHitColliderSpec BuildBladeTipSpec(
+            CombatVector3 tipLocalPosition,
+            CombatVector3 bladeForwardLocal,
+            float bladeLengthMeters = DefaultBladeLengthMeters,
+            float bladeWidthMeters = DefaultBladeWidthMeters,
+            float bladeThicknessMeters = DefaultBladeThicknessMeters)
+        {
+            var forward = bladeForwardLocal.Normalized;
+            if (forward.Magnitude <= 1e-6f)
+                forward = new CombatVector3(0f, 0f, 1f);
+
+            var backOffset = bladeLengthMeters * CenterBackFromTipFactor;
+            var center = new CombatVector3(
+                tipLocalPosition.X - forward.X * backOffset,
+                tipLocalPosition.Y - forward.Y * backOffset,
+                tipLocalPosition.Z - forward.Z * backOffset);
+
+            var size = new CombatVector3(bladeWidthMeters, bladeThicknessMeters, bladeLengthMeters);
+            return new MeleeBladeTipHitColliderSpec(center, size);
+        }
+    }
+
     public static class MeleeImpactFeedbackCalculator
     {
         public static float Intensity(

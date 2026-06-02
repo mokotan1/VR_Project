@@ -889,6 +889,7 @@ namespace VRProject.EditorTools
                 cap.transform.SetParent(root.transform, false);
                 cap.transform.localPosition = enemyLocalBase + new Vector3(i * 1.2f - 0.6f, 0.75f, 0f);
                 cap.AddComponent<SuperhotEnemy>();
+                cap.AddComponent<EnemyHitColorTint>();
                 cap.AddComponent<SuperhotEnemyMover>();
                 cap.AddComponent<SuperhotEnemyShooter>();
                 var agent = cap.AddComponent<NavMeshAgent>();

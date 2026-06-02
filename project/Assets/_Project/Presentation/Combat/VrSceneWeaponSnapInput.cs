@@ -1,5 +1,6 @@
 using Unity.XR.CoreUtils;
 using UnityEngine;
+using UnityEngine.InputSystem;
 using UnityEngine.XR;
 
 namespace VRProject.Presentation.Combat
@@ -12,6 +13,7 @@ namespace VRProject.Presentation.Combat
         [SerializeField, Range(0.01f, 1f)] float _analogTriggerThreshold = 0.55f;
         [SerializeField] Vector3 _rightFrontOffset = new Vector3(0.32f, -0.12f, 0.55f);
         [SerializeField] Vector3 _additionalWeaponStackOffset = new Vector3(0f, -0.18f, -0.08f);
+        [SerializeField] WeaponAttackProfile _sceneMeleeProfile;
 
         VrTriggerPressDetector _triggerDetector;
 
@@ -23,9 +25,7 @@ namespace VRProject.Presentation.Combat
 
         void Update()
         {
-            var device = InputDevices.GetDeviceAtXRNode(_fireHand);
-            var pressed = device.isValid && IsTriggerPressed(device, _analogTriggerThreshold);
-            if (_triggerDetector.Tick(pressed, out _triggerDetector))
+            if (_triggerDetector.Tick(IsPickupPressed(), out _triggerDetector))
                 SnapSceneWeaponsToRightFront();
         }
 
@@ -51,18 +51,78 @@ namespace VRProject.Presentation.Combat
             }
         }
 
+        bool IsPickupPressed()
+        {
+            if (IsEditorMousePickupPressed())
+                return true;
+
+            var device = InputDevices.GetDeviceAtXRNode(_fireHand);
+            if (!device.isValid)
+                return false;
+
+            device.TryGetFeatureValue(UnityEngine.XR.CommonUsages.triggerButton, out var triggerButton);
+            device.TryGetFeatureValue(UnityEngine.XR.CommonUsages.trigger, out var triggerValue);
+            device.TryGetFeatureValue(UnityEngine.XR.CommonUsages.gripButton, out var gripButton);
+            device.TryGetFeatureValue(UnityEngine.XR.CommonUsages.grip, out var gripValue);
+            return IsControllerPickupPressed(
+                triggerButton,
+                triggerValue,
+                gripButton,
+                gripValue,
+                _analogTriggerThreshold);
+        }
+
+        static bool IsEditorMousePickupPressed()
+        {
+#if UNITY_EDITOR
+            return Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame;
+#else
+            return false;
+#endif
+        }
+
+        public static bool IsControllerPickupPressed(
+            bool triggerButton,
+            float triggerValue,
+            bool gripButton,
+            float gripValue,
+            float analogThreshold)
+        {
+            if (triggerButton || triggerValue >= analogThreshold)
+                return true;
+
+            return gripButton || gripValue >= analogThreshold;
+        }
+
         void SnapWeapon(Transform weaponRoot, Transform anchor, int stackIndex)
         {
             var localOffset = _rightFrontOffset + _additionalWeaponStackOffset * Mathf.Max(0, stackIndex);
-            weaponRoot.SetParent(null, true);
-            weaponRoot.position = anchor.TransformPoint(localOffset);
-            weaponRoot.rotation = anchor.rotation;
+            weaponRoot.SetParent(anchor, false);
+            weaponRoot.localPosition = localOffset;
+            weaponRoot.localRotation = Quaternion.identity;
+
+            SceneMeleeWeaponSetup.Ensure(weaponRoot.gameObject, _sceneMeleeProfile);
+            TryAlignMeleeBladeTowardViewCenter(weaponRoot, anchor, localOffset);
+
+            var binder = weaponRoot.GetComponent<MeleeWeaponRuntimeBinder>();
+            if (binder != null)
+                binder.MarkPickedUpForVrSnap();
+
+            var router = weaponRoot.GetComponent<WeaponMotionSourceRouter>();
+            if (router != null)
+                router.ActivateVrSnappedHeldSource();
+
+            var vrSource = weaponRoot.GetComponent<VrGrabbedWeaponMotionSource>();
+            if (vrSource != null)
+                vrSource.NotifyHeldForVrSnap();
 
             var rb = weaponRoot.GetComponent<Rigidbody>();
             if (rb == null)
                 return;
+
             rb.linearVelocity = Vector3.zero;
             rb.angularVelocity = Vector3.zero;
+            rb.isKinematic = true;
         }
 
         Transform ResolveRightHandAnchor()
@@ -72,6 +132,50 @@ namespace VRProject.Presentation.Combat
             if (rightController != null)
                 return rightController;
             return _xrOrigin != null && _xrOrigin.Camera != null ? _xrOrigin.Camera.transform : root;
+        }
+
+        Transform ResolveViewTransform()
+        {
+            return _xrOrigin != null && _xrOrigin.Camera != null
+                ? _xrOrigin.Camera.transform
+                : null;
+        }
+
+        void TryAlignMeleeBladeTowardViewCenter(Transform weaponRoot, Transform anchor, Vector3 localOffset)
+        {
+            if (!IsMeleeSnapTarget(weaponRoot))
+                return;
+
+            if (!VrMeleeWeaponViewAlignment.TryGetBladeAxis(weaponRoot, out var handleLocal, out var tipLocal))
+                return;
+
+            var view = ResolveViewTransform();
+            if (view == null)
+                return;
+
+            if (!VrMeleeWeaponViewAlignment.TryComputeSnapLocalRotation(
+                    anchor,
+                    localOffset,
+                    handleLocal,
+                    tipLocal,
+                    view.position,
+                    view.forward,
+                    view.up,
+                    out var localRotation))
+                return;
+
+            weaponRoot.localRotation = localRotation;
+        }
+
+        static bool IsMeleeSnapTarget(Transform weaponRoot)
+        {
+            if (weaponRoot == null)
+                return false;
+
+            if (weaponRoot.GetComponent<MeleeWeaponRuntimeBinder>() != null)
+                return true;
+
+            return IsSceneAxeRoot(weaponRoot);
         }
 
         static Transform[] FindSceneWeaponRoots()
@@ -145,14 +249,6 @@ namespace VRProject.Presentation.Combat
             }
 
             return null;
-        }
-
-        static bool IsTriggerPressed(InputDevice device, float analogThreshold)
-        {
-            if (device.TryGetFeatureValue(CommonUsages.triggerButton, out var triggerButton) && triggerButton)
-                return true;
-            return device.TryGetFeatureValue(CommonUsages.trigger, out var triggerValue) &&
-                   triggerValue >= analogThreshold;
         }
     }
 }

@@ -553,7 +553,16 @@ namespace VRProject.EditorTools
                 root.AddComponent<SuperhotEnemyBrain>();
                 root.AddComponent<SuperhotEnemy>();
                 root.AddComponent<DamageReceiver>();
+                root.AddComponent<EnemyHitColorTint>();
                 MeleeEnemySetup.Ensure(root);
+
+                var shardBurst = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/GlassShards/Prefabs/GlassShardBurst.prefab");
+                if (shardBurst != null)
+                {
+                    var enemySo = new SerializedObject(root.GetComponent<SuperhotEnemy>());
+                    enemySo.FindProperty("_glassShardBurstPrefab").objectReferenceValue = shardBurst;
+                    enemySo.ApplyModifiedPropertiesWithoutUndo();
+                }
 
                 if (enemyLayer >= 0)
                     SetLayerRecursively(root, enemyLayer);

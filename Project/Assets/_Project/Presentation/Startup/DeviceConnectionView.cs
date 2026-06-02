@@ -25,6 +25,8 @@ namespace VRProject.Presentation.Startup
 
         [Header("Status Text")]
         [SerializeField] Text _platformText;
+        [SerializeField] Text _bluetoothStatusText;
+        [SerializeField] Text _metaQuestStatusText;
         [SerializeField] Text _xrStatusText;
         [SerializeField] Text _mobileStatusText;
         [SerializeField] Text _messageText;
@@ -70,6 +72,12 @@ namespace VRProject.Presentation.Startup
             if (_platformText != null)
                 _platformText.text = "Device: " + status.PlatformLabel;
 
+            if (_bluetoothStatusText != null)
+                _bluetoothStatusText.text = status.BluetoothStatusText;
+
+            if (_metaQuestStatusText != null)
+                _metaQuestStatusText.text = status.MetaQuestStatusText;
+
             if (_xrStatusText != null)
             {
                 var xrName = string.IsNullOrEmpty(status.XrDeviceName) ? "None" : status.XrDeviceName;
@@ -94,7 +102,7 @@ namespace VRProject.Presentation.Startup
             if (availability.VrAvailable && availability.MobileAvailable)
                 return "Both play modes are available. Choose how you want to play.";
             if (availability.MobileAvailable)
-                return "Mobile Play is available. Connect a VR headset and press Refresh to enable VR Play.";
+                return "Mobile Play is available. Pair Meta Quest over Bluetooth or connect XR, then press Refresh to enable VR Play.";
             if (availability.VrAvailable)
                 return "VR Play is available. Mobile Play is unavailable on this platform.";
             return "No playable mode is available. Check the connected device and press Refresh.";

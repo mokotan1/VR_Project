@@ -11,6 +11,16 @@ namespace VRProject.Presentation.Combat
         [SerializeField] WeaponAttackProfile _profile;
         [SerializeField] ParryWindow _parryWindow;
 
+        public void BindSetup(WeaponHitDetector detector, WeaponAttackProfile profile, ParryWindow parryWindow = null)
+        {
+            if (detector != null)
+                _detector = detector;
+            if (profile != null)
+                _profile = profile;
+            if (parryWindow != null)
+                _parryWindow = parryWindow;
+        }
+
         void Awake()
         {
             if (_detector == null)

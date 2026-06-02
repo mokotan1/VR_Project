@@ -23,6 +23,16 @@ namespace VRProject.Presentation.Combat
 
         public bool IsActive => enabled && _camera != null;
 
+        public void BindSetup(Transform tip, Transform handle, Transform forwardReference)
+        {
+            if (tip != null)
+                _tip = tip;
+            if (handle != null)
+                _handle = handle;
+            if (forwardReference != null)
+                _forwardReference = forwardReference;
+        }
+
         void OnEnable() => EnhancedTouchSupport.Enable();
         void OnDisable() => EnhancedTouchSupport.Disable();
 

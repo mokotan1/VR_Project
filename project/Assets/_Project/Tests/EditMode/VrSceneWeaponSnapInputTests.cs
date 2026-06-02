@@ -37,6 +37,16 @@ namespace VRProject.Tests.EditMode
 
             _gun = new GameObject("WeaponPickup_HK416");
             _axe = new GameObject("MeleeWeapon_Axe");
+            _axe.AddComponent<MeleeWeaponRuntimeBinder>();
+            _axe.AddComponent<WeaponMotionSourceRouter>();
+            var flatSource = _axe.AddComponent<FlatMouseWeaponMotionSource>();
+            var vrSource = _axe.AddComponent<VrGrabbedWeaponMotionSource>();
+            var handle = new GameObject("Handle").transform;
+            handle.SetParent(_axe.transform, false);
+            handle.localPosition = new Vector3(0f, 0f, -0.18f);
+            var tip = new GameObject("BladeTip").transform;
+            tip.SetParent(_axe.transform, false);
+            tip.localPosition = new Vector3(0f, 0f, 0.55f);
 
             var snapInput = _xrObject.AddComponent<VrSceneWeaponSnapInput>();
             snapInput.Bind(origin);
@@ -48,6 +58,12 @@ namespace VRProject.Tests.EditMode
             Assert.IsTrue(IsInSnapSlot(_gun.transform.position, firstSlot, secondSlot));
             Assert.IsTrue(IsInSnapSlot(_axe.transform.position, firstSlot, secondSlot));
             Assert.Greater(Vector3.Distance(_gun.transform.position, _axe.transform.position), 0.001f);
+            Assert.AreEqual(_rightController.transform, _axe.transform.parent);
+            Assert.IsTrue(vrSource.IsActive);
+            Assert.IsFalse(flatSource.enabled);
+
+            var bladeWorld = (tip.position - handle.position).normalized;
+            Assert.Greater(Vector3.Dot(bladeWorld, origin.Camera.transform.forward), 0.95f);
             Assert.IsNull(_rightController.transform.Find("XR_RuntimeGun"));
         }
 
@@ -55,6 +71,28 @@ namespace VRProject.Tests.EditMode
         {
             return Vector3.Distance(actual, firstSlot) < 0.001f ||
                    Vector3.Distance(actual, secondSlot) < 0.001f;
+        }
+
+        [Test]
+        public void IsControllerPickupPressed_ReturnsTrueForGripButton()
+        {
+            Assert.IsTrue(VrSceneWeaponSnapInput.IsControllerPickupPressed(
+                triggerButton: false,
+                triggerValue: 0f,
+                gripButton: true,
+                gripValue: 0f,
+                analogThreshold: 0.55f));
+        }
+
+        [Test]
+        public void IsControllerPickupPressed_ReturnsFalseWhenNeitherPressed()
+        {
+            Assert.IsFalse(VrSceneWeaponSnapInput.IsControllerPickupPressed(
+                triggerButton: false,
+                triggerValue: 0.1f,
+                gripButton: false,
+                gripValue: 0.2f,
+                analogThreshold: 0.55f));
         }
     }
 }

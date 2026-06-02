@@ -17,6 +17,16 @@ namespace VRProject.Presentation.Combat
 
         readonly DuplicateHitGuard _duplicateGuard = new DuplicateHitGuard();
 
+        public void BindSetup(WeaponMotion motion, WeaponAttackSession session, WeaponAttackProfile profile)
+        {
+            if (motion != null)
+                _motion = motion;
+            if (session != null)
+                _session = session;
+            if (profile != null)
+                _profile = profile;
+        }
+
         void Awake()
         {
             if (_motion == null)
@@ -78,6 +88,10 @@ namespace VRProject.Presentation.Combat
                     _session.IsActive,
                     score,
                     _profile.MinQualifyingScore,
+                    motion.LinearSpeedMps,
+                    motion.AngularSpeedDps,
+                    _profile.EnterLinearSpeed,
+                    _profile.EnterAngularSpeed,
                     kind,
                     _profile.Family))
                 return;

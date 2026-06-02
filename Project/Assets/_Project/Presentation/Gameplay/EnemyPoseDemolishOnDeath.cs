@@ -112,6 +112,55 @@ namespace VRProject.Presentation.Gameplay
                 DemolishFromLastHit();
         }
 
+        public float FragmentLifetimeSeconds => _fragmentLifetimeSeconds;
+
+        public static float ResolveMeleeFragmentImpulse(
+            float configuredImpulse,
+            float weaponImpulseNewtonSeconds)
+        {
+            var baseline = Mathf.Max(0f, configuredImpulse);
+            var weaponImpulse = Mathf.Max(0f, weaponImpulseNewtonSeconds);
+            return Mathf.Max(baseline, weaponImpulse);
+        }
+
+        public static float ResolveMeleeFragmentTorque(
+            float configuredTorque,
+            float weaponImpulseNewtonSeconds)
+        {
+            var baseline = Mathf.Max(0f, configuredTorque);
+            if (weaponImpulseNewtonSeconds <= 0f)
+                return baseline;
+
+            return Mathf.Max(baseline, weaponImpulseNewtonSeconds * 0.35f);
+        }
+
+        /// <summary>
+        /// VR/melee instant-kill path: spawn fragment burst using weapon physics plus inspector tuning.
+        /// </summary>
+        public bool TryDemolishFromMeleeHit(
+            Vector3 hitPoint,
+            Vector3 impulseDirection,
+            float weaponImpulseNewtonSeconds)
+        {
+            if (_demolished)
+                return false;
+
+            _lastHitPoint = hitPoint;
+            _hasHitPoint = true;
+            _demolished = true;
+
+            if (_fragmentFactoryOverride != null)
+            {
+                _fragmentFactoryOverride(gameObject, hitPoint);
+                return true;
+            }
+
+            var impulse = ResolveMeleeFragmentImpulse(_fragmentImpulse, weaponImpulseNewtonSeconds);
+            var torque = ResolveMeleeFragmentTorque(_fragmentTorque, weaponImpulseNewtonSeconds);
+            DemolishWithLowPolyShardBurst(hitPoint, impulse, torque, impulseDirection);
+            return true;
+        }
+
         void DemolishFromLastHit()
         {
             if (_demolished)
@@ -183,6 +232,15 @@ namespace VRProject.Presentation.Gameplay
 
         void DemolishWithLowPolyShardBurst(Vector3 hitPoint)
         {
+            DemolishWithLowPolyShardBurst(hitPoint, _fragmentImpulse, _fragmentTorque, Vector3.zero);
+        }
+
+        void DemolishWithLowPolyShardBurst(
+            Vector3 hitPoint,
+            float fragmentImpulse,
+            float fragmentTorque,
+            Vector3 impulseDirection)
+        {
             var sourceBounds = TryGetVisualBounds(out var sourceRenderer, out var visualBounds)
                 ? visualBounds
                 : new Bounds(transform.position, Vector3.one);
@@ -191,11 +249,17 @@ namespace VRProject.Presentation.Gameplay
             var settings = new EnemyLowPolyShardBurst.Settings(
                 _lowPolyShardCount,
                 _lowPolyShardScale,
-                Mathf.Max(_fragmentImpulse, mobileDefaults.Impulse),
-                Mathf.Max(_fragmentTorque, mobileDefaults.Torque),
+                Mathf.Max(fragmentImpulse, mobileDefaults.Impulse),
+                Mathf.Max(fragmentTorque, mobileDefaults.Torque),
                 _lowPolyShardSpreadMultiplier,
                 _lowPolyShardsUseBoxColliders);
-            var parent = EnemyLowPolyShardBurst.Spawn(name, sourceBounds, hitPoint, material, settings);
+            var parent = EnemyLowPolyShardBurst.Spawn(
+                name,
+                sourceBounds,
+                hitPoint,
+                material,
+                settings,
+                impulseDirection);
 
             HideOriginalEnemy();
             if (_fragmentLifetimeSeconds > 0f)

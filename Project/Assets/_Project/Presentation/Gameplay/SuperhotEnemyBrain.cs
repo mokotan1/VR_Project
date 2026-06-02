@@ -452,17 +452,20 @@ namespace VRProject.Presentation.Gameplay
         /// <summary>개발자 HUD용 — 적 이동·내비 상태.</summary>
         public string DebugStateName => _state.ToString();
 
-        public float DebugRemainingDistance => _agent != null ? _agent.remainingDistance : 0f;
+        public float DebugRemainingDistance => NavMeshAgentIsQueryable ? _agent.remainingDistance : 0f;
 
-        public bool DebugHasPath => _agent != null && _agent.hasPath;
+        public bool DebugHasPath => NavMeshAgentIsQueryable && _agent.hasPath;
 
-        public bool DebugPathPending => _agent != null && _agent.pathPending;
+        public bool DebugPathPending => NavMeshAgentIsQueryable && _agent.pathPending;
 
-        public bool DebugAgentStopped => _agent != null && _agent.isStopped;
+        public bool DebugAgentStopped => NavMeshAgentIsQueryable && _agent.isStopped;
 
-        public Vector3 DebugDesiredVelocity => _agent != null ? _agent.desiredVelocity : Vector3.zero;
+        public Vector3 DebugDesiredVelocity => NavMeshAgentIsQueryable ? _agent.desiredVelocity : Vector3.zero;
 
-        public Vector3 DebugNavDestination => _agent != null ? _agent.destination : Vector3.zero;
+        public Vector3 DebugNavDestination => NavMeshAgentIsQueryable ? _agent.destination : Vector3.zero;
+
+        bool NavMeshAgentIsQueryable =>
+            _agent != null && _agent.enabled && _agent.isOnNavMesh;
 
         void RefreshPlayerRef()
         {

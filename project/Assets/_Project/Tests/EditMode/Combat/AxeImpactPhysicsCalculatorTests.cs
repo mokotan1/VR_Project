@@ -53,5 +53,19 @@ namespace VRProject.Tests.EditMode.Combat
 
             Assert.AreEqual(0.425f, score, 1e-4f);
         }
+
+        [Test]
+        public void BuildBladeTipSpec_PlacesCenterNearTipWithCompactSize()
+        {
+            var spec = MeleeHitColliderLayout.BuildBladeTipSpec(
+                new CombatVector3(0f, 0f, 0.55f),
+                new CombatVector3(0f, 0f, 1f));
+
+            Assert.Less(spec.LocalSize.X, 0.12f);
+            Assert.Less(spec.LocalSize.Y, 0.12f);
+            Assert.Less(spec.LocalSize.Z, 0.22f);
+            Assert.Greater(spec.LocalCenter.Z, 0.45f);
+            Assert.Less(spec.LocalCenter.Z, 0.55f);
+        }
     }
 }

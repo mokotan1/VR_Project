@@ -91,21 +91,5 @@ namespace VRProject.Tests.EditMode
                 PlayModeKind.None,
                 PlayModeSelection.ResolveSelectedMode(PlayModeKind.Vr, availability));
         }
-
-        [Test]
-        public void ResolveVrAvailable_WhenEditorWithoutHeadset_ReturnsTrue()
-        {
-            Assert.IsTrue(DeviceConnectionProbe.ResolveVrAvailable(
-                xrDeviceActive: false,
-                isEditor: true));
-        }
-
-        [Test]
-        public void ResolveVrAvailable_WhenRuntimeWithoutHeadset_ReturnsFalse()
-        {
-            Assert.IsFalse(DeviceConnectionProbe.ResolveVrAvailable(
-                xrDeviceActive: false,
-                isEditor: false));
-        }
     }
 }

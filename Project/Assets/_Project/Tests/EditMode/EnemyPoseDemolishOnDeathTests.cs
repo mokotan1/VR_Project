@@ -12,6 +12,39 @@ namespace VRProject.Tests.EditMode
     public sealed class EnemyPoseDemolishOnDeathTests
     {
         [Test]
+        public void ResolveMeleeFragmentImpulse_UsesConfiguredAndWeaponValues()
+        {
+            Assert.AreEqual(12f, EnemyPoseDemolishOnDeath.ResolveMeleeFragmentImpulse(12f, 4f));
+            Assert.AreEqual(15f, EnemyPoseDemolishOnDeath.ResolveMeleeFragmentImpulse(7.5f, 15f));
+        }
+
+        [Test]
+        public void TryDemolishFromMeleeHit_UsesLastHitPoint()
+        {
+            var go = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+            try
+            {
+                var effect = go.AddComponent<EnemyPoseDemolishOnDeath>();
+                var hitPoint = new Vector3(0.3f, 0.8f, -0.2f);
+                var captured = Vector3.negativeInfinity;
+
+                effect.SetFragmentFactoryForTests((_, point) =>
+                {
+                    captured = point;
+                    return true;
+                });
+
+                Assert.IsTrue(effect.TryDemolishFromMeleeHit(hitPoint, Vector3.forward, 10f));
+                Assert.AreEqual(hitPoint, captured);
+            }
+            finally
+            {
+                if (go != null)
+                    Object.DestroyImmediate(go);
+            }
+        }
+
+        [Test]
         public void BuildBreakPointPositions_UsesHitPointAsFirstPoint()
         {
             var bounds = new Bounds(Vector3.zero, Vector3.one * 2f);

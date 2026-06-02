@@ -96,6 +96,14 @@ namespace VRProject.Presentation.Combat
             SelectSource();
         }
 
+        public void ActivateVrSnappedHeldSource()
+        {
+            DisableSources();
+            SetActive(_vrSource, true);
+            _activeSource = _vrSource;
+            ConfigureBodyForHeldFlatOrMobile(false);
+        }
+
         void DisableSources()
         {
             SetActive(_vrSource, false);

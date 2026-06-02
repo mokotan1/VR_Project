@@ -91,7 +91,7 @@ namespace VRProject.Presentation.Combat
 
             if (_enemy != null)
             {
-                _enemy.Kill(context.HitPoint, context.HitNormal);
+                _enemy.Kill(context);
                 return true;
             }
 

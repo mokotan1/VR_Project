@@ -19,6 +19,21 @@ namespace VRProject.Presentation.Combat
 
         public bool IsActive => _isSelected && enabled;
 
+        public void BindSetup(Transform tip, Transform handle, Transform forwardReference)
+        {
+            if (tip != null)
+                _tip = tip;
+            if (handle != null)
+                _handle = handle;
+            if (forwardReference != null)
+                _forwardReference = forwardReference;
+        }
+
+        public void NotifyHeldForVrSnap()
+        {
+            _isSelected = true;
+        }
+
         void Awake()
         {
             _grab = GetComponent<XRGrabInteractable>();

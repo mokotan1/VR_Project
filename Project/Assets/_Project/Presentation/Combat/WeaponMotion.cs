@@ -43,6 +43,16 @@ namespace VRProject.Presentation.Combat
 
         public WeaponMotionState Current => _current;
 
+        public void BindSetup(WeaponMotionSourceRouter router, WeaponAttackProfile profile, Transform rotationReference)
+        {
+            if (router != null)
+                _router = router;
+            if (profile != null)
+                _profile = profile;
+            if (rotationReference != null)
+                _rotationReference = rotationReference;
+        }
+
         void Awake()
         {
             if (_router == null)

@@ -15,6 +15,14 @@ namespace VRProject.Presentation.Combat
         public int CurrentSessionId => _state.SessionId;
         public WeaponAttackKind ActiveKind => _motion != null ? _motion.Current.ActiveKind : WeaponAttackKind.None;
 
+        public void BindSetup(WeaponMotion motion, WeaponAttackProfile profile)
+        {
+            if (motion != null)
+                _motion = motion;
+            if (profile != null)
+                _profile = profile;
+        }
+
         void Awake()
         {
             if (_motion == null)

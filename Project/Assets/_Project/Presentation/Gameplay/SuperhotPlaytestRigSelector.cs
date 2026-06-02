@@ -1,7 +1,7 @@
 using Unity.XR.CoreUtils;
 using UnityEngine;
-using UnityEngine.XR;
 using VRProject.Application.Startup;
+using VRProject.Infrastructure.Startup;
 using VRProject.Presentation.Combat;
 using VRProject.Presentation.PrototypeFps;
 using VRProject.Presentation.Startup;
@@ -28,14 +28,15 @@ namespace VRProject.Presentation.Gameplay
 
         void Awake()
         {
+            var readiness = VrConnectionSignalSampler.Sample();
             var availability = new PlayModeAvailability(
                 mobileAvailable: true,
-                vrAvailable: (XRSettings.isDeviceActive || UnityEngine.Application.isEditor) && !_forceFlatForTesting);
+                vrAvailable: VrPlayAvailability.IsVrPlayAvailable(readiness) && !_forceFlatForTesting);
 
             var selected = PlayModeSession.GetSelectedModeOrFallback(availability);
             if (_forceFlatForTesting)
                 selected = PlayModeKind.Mobile;
-            else if (selected == PlayModeKind.None && _autoUseXrWhenActive && XRSettings.isDeviceActive)
+            else if (selected == PlayModeKind.None && _autoUseXrWhenActive && VrPlayAvailability.IsVrPlayAvailable(readiness))
                 selected = PlayModeKind.Vr;
 
             ApplyRigSelection(selected == PlayModeKind.Vr);
