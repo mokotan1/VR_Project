@@ -24,7 +24,13 @@ namespace VRProject.Presentation.Combat
             _grab = GetComponent<XRGrabInteractable>();
             if (_grab != null)
             {
-                _grab.selectEntered.AddListener(_ => _isSelected = true);
+                _grab.selectEntered.AddListener(_ =>
+                {
+                    _isSelected = true;
+                    var binder = GetComponent<MeleeWeaponRuntimeBinder>();
+                    if (binder != null)
+                        binder.PickUpForFlatOrMobile();
+                });
                 _grab.selectExited.AddListener(_ => _isSelected = false);
             }
         }

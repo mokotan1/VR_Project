@@ -48,12 +48,31 @@ namespace VRProject.Presentation.Combat
 
             var motion = _motion.Current;
             var kind = motion.ActiveKind;
-            var score = MeleeQualifyingHitCalculator.QualifyingScore(
+            var motionScore = MeleeQualifyingHitCalculator.QualifyingScore(
                 motion.LinearSpeedMps,
                 _profile.MinLinearSpeed,
                 _profile.ReferenceLinearSpeed,
                 kind,
                 zone.FeedbackMultiplier);
+            var impact = AxeImpactPhysicsCalculator.Calculate(
+                motion.LinearSpeedMps,
+                motion.AngularSpeedDps,
+                _profile.MassKg,
+                _profile.BladeRadiusMeters,
+                _profile.MomentOfInertiaScale,
+                _profile.ImpactDurationSeconds,
+                _profile.BladeContactAreaSquareMeters,
+                _profile.RigidbodyImpulseScale,
+                _profile.MaxRigidbodyImpulse);
+            var score = AxeImpactPhysicsCalculator.Score(
+                motionScore,
+                impact,
+                _profile.MinImpactEnergyJoules,
+                _profile.ReferenceImpactEnergyJoules,
+                _profile.ReferencePressurePascals,
+                _profile.MotionScoreWeight,
+                _profile.EnergyScoreWeight,
+                _profile.PressureScoreWeight);
 
             if (!MeleeHitValidator.IsQualifyingHit(
                     _session.IsActive,
@@ -90,7 +109,16 @@ namespace VRProject.Presentation.Combat
                 score,
                 _profile.MinQualifyingScore);
 
-            var context = new WeaponHitContext(zone, hitPoint, hitNormal, kind, score, _session.CurrentSessionId);
+            var context = new WeaponHitContext(
+                zone,
+                hitPoint,
+                hitNormal,
+                kind,
+                score,
+                _session.CurrentSessionId,
+                impact,
+                motion.SwingDirection,
+                _profile.ReferenceImpactEnergyJoules);
             if (receiver.TryReceiveHit(context))
             {
                 HitConfirmed?.Invoke(context);

@@ -33,6 +33,14 @@ namespace VRProject.Presentation.Combat
             if (_mobileSource == null)
                 _mobileSource = GetComponent<MobileTouchWeaponMotionSource>();
 
+            if (GetComponent<MeleeWeaponRuntimeBinder>() != null)
+            {
+                DisableSources();
+                ConfigureBodyForHeldFlatOrMobile(false);
+                _activeSource = null;
+                return;
+            }
+
             SelectSource();
         }
 
@@ -55,12 +63,12 @@ namespace VRProject.Presentation.Combat
 
         void SelectSource()
         {
-            var availability = new PlayModeAvailability(mobileAvailable: true, vrAvailable: XRSettings.isDeviceActive);
+            var availability = new PlayModeAvailability(
+                mobileAvailable: true,
+                vrAvailable: XRSettings.isDeviceActive || UnityEngine.Application.isEditor);
             var mode = PlayModeSession.GetSelectedModeOrFallback(availability);
 
-            SetActive(_vrSource, false);
-            SetActive(_flatSource, false);
-            SetActive(_mobileSource, false);
+            DisableSources();
 
             if (mode == PlayModeKind.Vr)
             {
@@ -81,6 +89,18 @@ namespace VRProject.Presentation.Combat
             SetActive(_flatSource, true);
             _activeSource = _flatSource;
             ConfigureBodyForHeldFlatOrMobile(true);
+        }
+
+        public void ActivatePickedUpSource()
+        {
+            SelectSource();
+        }
+
+        void DisableSources()
+        {
+            SetActive(_vrSource, false);
+            SetActive(_flatSource, false);
+            SetActive(_mobileSource, false);
         }
 
         static void SetActive(MonoBehaviour source, bool active)

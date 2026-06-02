@@ -29,6 +29,21 @@ namespace VRProject.Presentation.Combat
         [SerializeField] float _minQualifyingScore = 0.35f;
         [SerializeField] float _perTargetCooldownSeconds = 0.2f;
 
+        [Header("Axe Impact Physics")]
+        [SerializeField] float _massKg = 2f;
+        [SerializeField] float _bladeRadiusMeters = 0.75f;
+        [SerializeField] float _momentOfInertiaScale = 1f;
+        [SerializeField] float _impactDurationSeconds = 0.025f;
+        [SerializeField] float _bladeContactAreaSquareMeters = 0.00045f;
+        [SerializeField] float _minImpactEnergyJoules = 8f;
+        [SerializeField] float _referenceImpactEnergyJoules = 32f;
+        [SerializeField] float _referencePressurePascals = 1000000f;
+        [SerializeField] float _motionScoreWeight = 0.25f;
+        [SerializeField] float _energyScoreWeight = 0.45f;
+        [SerializeField] float _pressureScoreWeight = 0.3f;
+        [SerializeField] float _rigidbodyImpulseScale = 0.7f;
+        [SerializeField] float _maxRigidbodyImpulse = 18f;
+
         [Header("Feedback")]
         [SerializeField, Range(0f, 1f)] float _hitHapticAmplitude = 0.55f;
         [SerializeField] float _hitHapticDurationSeconds = 0.08f;
@@ -50,6 +65,19 @@ namespace VRProject.Presentation.Combat
         public float ReferenceLinearSpeed => _referenceLinearSpeed;
         public float MinQualifyingScore => _minQualifyingScore;
         public float PerTargetCooldownSeconds => _perTargetCooldownSeconds;
+        public float MassKg => _massKg;
+        public float BladeRadiusMeters => _bladeRadiusMeters;
+        public float MomentOfInertiaScale => _momentOfInertiaScale;
+        public float ImpactDurationSeconds => _impactDurationSeconds;
+        public float BladeContactAreaSquareMeters => _bladeContactAreaSquareMeters;
+        public float MinImpactEnergyJoules => _minImpactEnergyJoules;
+        public float ReferenceImpactEnergyJoules => _referenceImpactEnergyJoules;
+        public float ReferencePressurePascals => _referencePressurePascals;
+        public float MotionScoreWeight => _motionScoreWeight;
+        public float EnergyScoreWeight => _energyScoreWeight;
+        public float PressureScoreWeight => _pressureScoreWeight;
+        public float RigidbodyImpulseScale => _rigidbodyImpulseScale;
+        public float MaxRigidbodyImpulse => _maxRigidbodyImpulse;
         public float HitHapticAmplitude => _hitHapticAmplitude;
         public float HitHapticDurationSeconds => _hitHapticDurationSeconds;
         public float BlockHapticAmplitude => _blockHapticAmplitude;
@@ -66,6 +94,18 @@ namespace VRProject.Presentation.Combat
             _maxSessionDurationSeconds = Mathf.Max(0.05f, _maxSessionDurationSeconds);
             _referenceLinearSpeed = Mathf.Max(_minLinearSpeed + 0.01f, _referenceLinearSpeed);
             _perTargetCooldownSeconds = Mathf.Max(0f, _perTargetCooldownSeconds);
+            _massKg = Mathf.Max(0.01f, _massKg);
+            _bladeRadiusMeters = Mathf.Max(0.01f, _bladeRadiusMeters);
+            _momentOfInertiaScale = Mathf.Max(0f, _momentOfInertiaScale);
+            _impactDurationSeconds = Mathf.Max(0.001f, _impactDurationSeconds);
+            _bladeContactAreaSquareMeters = Mathf.Max(0.00001f, _bladeContactAreaSquareMeters);
+            _referenceImpactEnergyJoules = Mathf.Max(_minImpactEnergyJoules + 0.01f, _referenceImpactEnergyJoules);
+            _referencePressurePascals = Mathf.Max(1f, _referencePressurePascals);
+            _motionScoreWeight = Mathf.Max(0f, _motionScoreWeight);
+            _energyScoreWeight = Mathf.Max(0f, _energyScoreWeight);
+            _pressureScoreWeight = Mathf.Max(0f, _pressureScoreWeight);
+            _rigidbodyImpulseScale = Mathf.Max(0f, _rigidbodyImpulseScale);
+            _maxRigidbodyImpulse = Mathf.Max(0f, _maxRigidbodyImpulse);
             _parryWindowSeconds = Mathf.Max(0.01f, _parryWindowSeconds);
         }
 #endif

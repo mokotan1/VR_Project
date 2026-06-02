@@ -1,5 +1,6 @@
 using NUnit.Framework;
 using VRProject.Application.Startup;
+using VRProject.Presentation.Startup;
 
 namespace VRProject.Tests.EditMode
 {
@@ -89,6 +90,22 @@ namespace VRProject.Tests.EditMode
             Assert.AreEqual(
                 PlayModeKind.None,
                 PlayModeSelection.ResolveSelectedMode(PlayModeKind.Vr, availability));
+        }
+
+        [Test]
+        public void ResolveVrAvailable_WhenEditorWithoutHeadset_ReturnsTrue()
+        {
+            Assert.IsTrue(DeviceConnectionProbe.ResolveVrAvailable(
+                xrDeviceActive: false,
+                isEditor: true));
+        }
+
+        [Test]
+        public void ResolveVrAvailable_WhenRuntimeWithoutHeadset_ReturnsFalse()
+        {
+            Assert.IsFalse(DeviceConnectionProbe.ResolveVrAvailable(
+                xrDeviceActive: false,
+                isEditor: false));
         }
     }
 }

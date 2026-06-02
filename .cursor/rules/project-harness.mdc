@@ -1,0 +1,38 @@
+---
+description: Use the central Codex project harness from this repo root before substantive work and verification
+alwaysApply: true
+---
+
+# Project Harness (VR_Project)
+
+중앙 하니스: `C:\Users\user\Documents\Codex\project-harness`  
+이 저장소 루트(`D:\VR_Project`)에서는 **래퍼**로 호출한다. 프로젝트 이름은 기본값 `VR_Project`.
+
+## 호출 방법
+
+저장소 루트에서 PowerShell 또는 cmd:
+
+```powershell
+.\harness.cmd context
+.\harness.cmd changed
+.\harness.cmd logs
+.\harness.cmd doctor
+.\harness.cmd verify
+```
+
+다른 프로젝트를 명시하려면 두 번째 인자를 넘긴다: `.\harness.cmd context gains_and_guide`
+
+## 에이전트 필수 절차
+
+실질적인 코드 작업·디버깅·완료 주장 전에:
+
+1. **`.\harness.cmd context`** — 컴팩트 컨텍스트·토큰 정책 확인 (또는 출력을 따름).
+2. **`.\harness.cmd changed`** — 무시 경로 필터링된 변경 목록 확인 후, 필요한 파일만 열기.
+3. 완료·통과 주장 전 **`.\harness.cmd verify`** (또는 최소 `test` / `lint`) 실행하고 출력을 근거로 제시.
+
+로그 분석 시 전체 Unity 로그 붙여넣기 대신 **`.\harness.cmd logs`** 우선.
+
+## 금지
+
+- `project/Library`, `project/Temp`, `project/Obj` 등 하니스 `ignore` 경로를 기본 스캔 대상으로 삼지 않는다.
+- 중앙 하니스 경로를 바꿨다면 `harness.ps1` / `harness.cmd`의 `CENTRAL` 경로도 함께 갱신한다.

@@ -87,11 +87,37 @@ namespace VRProject.EditorTools
             }
 
             var instance = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
-            instance.transform.position = new Vector3(1.5f, 1f, 2f);
+            ConfigureMeleePickupInstance(instance, new Vector3(1.5f, 0.12f, 2f));
             instance.transform.rotation = Quaternion.Euler(0f, 35f, 0f);
             EditorSceneManager.MarkSceneDirty(instance.scene);
             Selection.activeGameObject = instance;
             Debug.Log("[VR Project] Spawned melee weapon in open scene.");
+        }
+
+        [MenuItem("VR Project/Combat/Unsnap Melee Weapons To Floor Pickups In Open Scene")]
+        public static void UnsnapMeleeWeaponsToFloorPickupsInOpenScene()
+        {
+            if (!IsUnityChanSceneOpen())
+            {
+                Debug.LogWarning("[VR Project] Open UnityChanPrototypeFps before unsnapping melee weapons.");
+                return;
+            }
+
+            var changed = 0;
+            foreach (var binder in Object.FindObjectsByType<MeleeWeaponRuntimeBinder>(FindObjectsInactive.Include))
+            {
+                if (binder == null)
+                    continue;
+
+                var go = binder.gameObject;
+                var position = go.transform.position;
+                position.y = 0.12f;
+                ConfigureMeleePickupInstance(go, position);
+                changed++;
+            }
+
+            EditorSceneManager.MarkSceneDirty(EditorSceneManager.GetActiveScene());
+            Debug.Log($"[VR Project] Unsnap melee floor pickup setup applied to {changed} weapon(s).");
         }
 
         [MenuItem("VR Project/Combat/Wire Enemy Melee Hit Zones In Open Scene")]
@@ -120,6 +146,18 @@ namespace VRProject.EditorTools
             return scene.path.Replace('\\', '/').EndsWith("UnityChanPrototypeFps.unity");
         }
 
+        static void ConfigureMeleePickupInstance(GameObject instance, Vector3 worldPosition)
+        {
+            if (instance == null)
+                return;
+
+            instance.transform.SetParent(null, true);
+            instance.transform.position = worldPosition;
+
+            var grab = instance.GetComponent<XRGrabInteractable>();
+            ConfigureGrabInteractable(grab);
+        }
+
         static void CreateProfileIfMissing(string path, WeaponFamily family, float enterLinear, float stabDot, float slashDot)
         {
             if (AssetDatabase.LoadAssetAtPath<WeaponAttackProfile>(path) != null)
@@ -143,7 +181,7 @@ namespace VRProject.EditorTools
             body.interpolation = RigidbodyInterpolation.Interpolate;
             body.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
 
-            root.AddComponent<XRGrabInteractable>();
+            ConfigureGrabInteractable(root.AddComponent<XRGrabInteractable>());
             root.AddComponent<WeaponMotionSourceRouter>();
             root.AddComponent<VrGrabbedWeaponMotionSource>();
             root.AddComponent<FlatMouseWeaponMotionSource>();
@@ -184,6 +222,21 @@ namespace VRProject.EditorTools
             WireComponentReferences(root, handle, tip, forwardRef, profile, blade.GetComponent<WeaponHitDetector>());
 
             return root;
+        }
+
+        static void ConfigureGrabInteractable(XRGrabInteractable grab)
+        {
+            if (grab == null)
+                return;
+
+            var so = new SerializedObject(grab);
+            var snapToCollider = so.FindProperty("m_SnapToColliderVolume");
+            if (snapToCollider != null)
+                snapToCollider.boolValue = false;
+            var retainParent = so.FindProperty("m_RetainTransformParent");
+            if (retainParent != null)
+                retainParent.boolValue = false;
+            so.ApplyModifiedPropertiesWithoutUndo();
         }
 
         static void WireComponentReferences(

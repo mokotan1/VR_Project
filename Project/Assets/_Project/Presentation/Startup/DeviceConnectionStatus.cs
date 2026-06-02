@@ -35,7 +35,16 @@ namespace VRProject.Presentation.Startup
         public string MobileStatusText =>
             Availability.MobileAvailable ? "Mobile Play Ready" : "Mobile Play Unavailable";
 
-        public string VrStatusText =>
-            Availability.VrAvailable ? "VR Headset Ready" : "VR Headset Not Connected";
+        public string VrStatusText
+        {
+            get
+            {
+                if (XrDeviceActive)
+                    return "VR Headset Ready";
+                if (IsEditor && Availability.VrAvailable)
+                    return "XR Simulator Ready";
+                return "VR Headset Not Connected";
+            }
+        }
     }
 }

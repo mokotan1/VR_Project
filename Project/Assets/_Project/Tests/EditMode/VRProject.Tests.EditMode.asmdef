@@ -5,7 +5,8 @@
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner",
         "VRProject.Application",
-        "VRProject.Presentation"
+        "VRProject.Presentation",
+        "Unity.XR.CoreUtils"
     ],
     "includePlatforms": [
         "Editor"

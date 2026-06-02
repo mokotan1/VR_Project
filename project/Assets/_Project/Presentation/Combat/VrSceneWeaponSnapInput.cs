@@ -1,0 +1,158 @@
+using Unity.XR.CoreUtils;
+using UnityEngine;
+using UnityEngine.XR;
+
+namespace VRProject.Presentation.Combat
+{
+    [DisallowMultipleComponent]
+    public sealed class VrSceneWeaponSnapInput : MonoBehaviour
+    {
+        [SerializeField] XROrigin _xrOrigin;
+        [SerializeField] XRNode _fireHand = XRNode.RightHand;
+        [SerializeField, Range(0.01f, 1f)] float _analogTriggerThreshold = 0.55f;
+        [SerializeField] Vector3 _rightFrontOffset = new Vector3(0.32f, -0.12f, 0.55f);
+        [SerializeField] Vector3 _additionalWeaponStackOffset = new Vector3(0f, -0.18f, -0.08f);
+
+        VrTriggerPressDetector _triggerDetector;
+
+        void Awake()
+        {
+            if (_xrOrigin == null)
+                _xrOrigin = GetComponent<XROrigin>();
+        }
+
+        void Update()
+        {
+            var device = InputDevices.GetDeviceAtXRNode(_fireHand);
+            var pressed = device.isValid && IsTriggerPressed(device, _analogTriggerThreshold);
+            if (_triggerDetector.Tick(pressed, out _triggerDetector))
+                SnapSceneWeaponsToRightFront();
+        }
+
+        public void Bind(XROrigin xrOrigin)
+        {
+            _xrOrigin = xrOrigin;
+        }
+
+        public void SnapSceneWeaponsToRightFront()
+        {
+            var anchor = ResolveRightHandAnchor();
+            if (anchor == null)
+                return;
+
+            var snapped = 0;
+            foreach (var weaponRoot in FindSceneWeaponRoots())
+            {
+                if (weaponRoot == null)
+                    continue;
+
+                SnapWeapon(weaponRoot, anchor, snapped);
+                snapped++;
+            }
+        }
+
+        void SnapWeapon(Transform weaponRoot, Transform anchor, int stackIndex)
+        {
+            var localOffset = _rightFrontOffset + _additionalWeaponStackOffset * Mathf.Max(0, stackIndex);
+            weaponRoot.SetParent(null, true);
+            weaponRoot.position = anchor.TransformPoint(localOffset);
+            weaponRoot.rotation = anchor.rotation;
+
+            var rb = weaponRoot.GetComponent<Rigidbody>();
+            if (rb == null)
+                return;
+            rb.linearVelocity = Vector3.zero;
+            rb.angularVelocity = Vector3.zero;
+        }
+
+        Transform ResolveRightHandAnchor()
+        {
+            var root = _xrOrigin != null ? _xrOrigin.transform : transform;
+            var rightController = FindChildTransformByName(root, "Right Controller");
+            if (rightController != null)
+                return rightController;
+            return _xrOrigin != null && _xrOrigin.Camera != null ? _xrOrigin.Camera.transform : root;
+        }
+
+        static Transform[] FindSceneWeaponRoots()
+        {
+            var results = new System.Collections.Generic.List<Transform>();
+
+            foreach (var melee in UnityEngine.Object.FindObjectsByType<MeleeWeaponRuntimeBinder>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+                AddUnique(results, melee.transform);
+
+            foreach (var transform in UnityEngine.Object.FindObjectsByType<Transform>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+            {
+                if (IsSceneGunRoot(transform) || IsSceneAxeRoot(transform))
+                    AddUnique(results, transform);
+            }
+
+            return results.ToArray();
+        }
+
+        static bool IsSceneGunRoot(Transform transform)
+        {
+            var name = transform.name;
+            return name == "WeaponPickup_HK416" ||
+                   name == "PickupVisual_HK416" ||
+                   name == "HandGun_HK416";
+        }
+
+        static bool IsSceneAxeRoot(Transform transform)
+        {
+            var name = transform.name;
+            return name.Contains("Axe") || name.Contains("MeleeWeapon");
+        }
+
+        static void AddUnique(System.Collections.Generic.List<Transform> results, Transform candidate)
+        {
+            if (candidate == null)
+                return;
+            var root = ResolveSceneWeaponRoot(candidate);
+            if (!results.Contains(root))
+                results.Add(root);
+        }
+
+        static Transform ResolveSceneWeaponRoot(Transform candidate)
+        {
+            var melee = candidate.GetComponentInParent<MeleeWeaponRuntimeBinder>();
+            if (melee != null)
+                return melee.transform;
+
+            var current = candidate;
+            while (current.parent != null)
+            {
+                if (current.parent.name == "WeaponPickup_HK416" ||
+                    current.parent.name.Contains("MeleeWeapon") ||
+                    current.parent.name.Contains("Axe"))
+                    current = current.parent;
+                else
+                    break;
+            }
+
+            return current;
+        }
+
+        static Transform FindChildTransformByName(Transform root, string childName)
+        {
+            if (root == null)
+                return null;
+
+            foreach (var child in root.GetComponentsInChildren<Transform>(true))
+            {
+                if (child.name == childName)
+                    return child;
+            }
+
+            return null;
+        }
+
+        static bool IsTriggerPressed(InputDevice device, float analogThreshold)
+        {
+            if (device.TryGetFeatureValue(CommonUsages.triggerButton, out var triggerButton) && triggerButton)
+                return true;
+            return device.TryGetFeatureValue(CommonUsages.trigger, out var triggerValue) &&
+                   triggerValue >= analogThreshold;
+        }
+    }
+}
