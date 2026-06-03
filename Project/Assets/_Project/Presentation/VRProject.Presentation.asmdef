@@ -6,6 +6,7 @@
         "VRProject.Application",
         "VRProject.Infrastructure",
         "Unity.XR.Interaction.Toolkit",
+        "Unity.XR.Management",
         "Unity.InputSystem",
         "Unity.XR.CoreUtils",
         "UnityEngine.UI",
